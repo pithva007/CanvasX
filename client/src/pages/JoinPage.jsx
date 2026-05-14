@@ -72,11 +72,11 @@ export function JoinPage({ onJoinRoom }) {
         </div>
 
         {/* Main Card */}
-        <div className="glass glass border border-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
           <form onSubmit={handleJoin} className="space-y-6">
             {/* Password Input */}
             <div>
-              <label className="block text-sm font-medium text-white mb-3">
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
                 Room Password
               </label>
               <div className="relative">
@@ -87,11 +87,11 @@ export function JoinPage({ onJoinRoom }) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter room password"
                   disabled={!connected || loading}
-                  className="input input pl-10 bg-slate-800/50 border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="input input pl-10 bg-white border-2 border-slate-300 text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   autoFocus
                 />
               </div>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-slate-600 mt-2 font-medium">
                 Use any password to create or join a room
               </p>
             </div>
@@ -117,9 +117,9 @@ export function JoinPage({ onJoinRoom }) {
           </form>
 
           {/* Features */}
-          <div className="mt-8 pt-6 border-t border-slate-700">
-            <p className="text-xs text-slate-400 mb-4">Features:</p>
-            <div className="space-y-2 text-sm text-slate-300">
+          <div className="mt-8 pt-6 border-t border-slate-300">
+            <p className="text-xs font-semibold text-slate-700 mb-4">Features:</p>
+            <div className="space-y-2 text-sm text-slate-700 font-medium">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                 <span>Draw together in real-time</span>
@@ -141,7 +141,7 @@ export function JoinPage({ onJoinRoom }) {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-slate-500 text-xs mt-8">
+        <p className="text-center text-slate-600 text-xs mt-8 font-semibold">
           Maximum 2 users per room
         </p>
       </div>
