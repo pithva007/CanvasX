@@ -16,19 +16,24 @@ const PORT = process.env.PORT || 3001
 const NODE_ENV = process.env.NODE_ENV || 'development'
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173'
 
+// Determine allowed origin for CORS
+const allowedOrigin = CLIENT_URL ? CLIENT_URL.replace(/\/$/, '') : '*'
+
 // Middleware
 app.use(corsMiddleware)
 app.use(loggerMiddleware)
 app.use(express.json())
 app.use(express.static('public'))
 
-// Socket.IO setup
+// Socket.IO setup with proper CORS
 const io = new Server(server, {
   cors: {
-    origin: CLIENT_URL,
+    origin: allowedOrigin,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
+  allowEIO3: true,
 })
 
 // Room manager
@@ -82,7 +87,7 @@ server.listen(PORT, () => {
 ╚════════════════════════════════════════╝
 
 API Health: http://localhost:${PORT}/health
-CORS Origin: ${CLIENT_URL}
+CORS Origin: ${allowedOrigin}
   `)
 })
 
