@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: drawtogether-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: CLIENT_URL
+        sync: false
+    rootDir: server
+
+  - type: web
+    name: drawtogether-frontend
+    runtime: static
+    plan: free
+    buildCommand: npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_SOCKET_URL
+        value: https://drawtogether-backend.onrender.com
+      - key: VITE_API_URL
+        value: https://drawtogether-backend.onrender.com
+    rootDir: client
