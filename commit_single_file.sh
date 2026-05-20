@@ -1,17 +1,10 @@
 BRANCH=$(git branch --show-current)
 
 FILES=(
-"server/.env.example"
-"server/.gitignore"
-"server/package-lock.json"
-"server/package.json"
+"client/src/context/SocketContext.jsx"
+"client/src/pages/JoinPage.jsx"
 "server/src/index.js"
 "server/src/middleware/common.js"
-"server/src/rooms/RoomManager.js"
-"server/src/socket/handlers.js"
-"server/src/utils/constants.js"
-"server/src/utils/logger.js"
-"server/src/utils/validators.js"
 )
 
 for FILE in "${FILES[@]}"

@@ -12,13 +12,20 @@ export const useSocket = () => {
 }
 
 export function SocketProvider({ children }) {
+  const [serverUrl, setServerUrl] = useState(() => {
+    return (
+      localStorage.getItem('drawtogether_server_url') ||
+      import.meta.env.VITE_SOCKET_URL ||
+      'http://localhost:3001'
+    )
+  })
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'
-    
-    const newSocket = io(socketUrl, {
+    if (!serverUrl) return
+
+    const newSocket = io(serverUrl, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -38,10 +45,23 @@ export function SocketProvider({ children }) {
     return () => {
       newSocket.disconnect()
     }
-  }, [])
+  }, [serverUrl])
+
+  const updateServerUrl = (url) => {
+    let formattedUrl = url.trim()
+    if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = 'http://' + formattedUrl
+    }
+
+    if (formattedUrl) {
+      localStorage.setItem('drawtogether_server_url', formattedUrl)
+      setServerUrl(formattedUrl)
+      setConnected(false)
+    }
+  }
 
   return (
-    <SocketContext.Provider value={{ socket, connected }}>
+    <SocketContext.Provider value={{ socket, connected, serverUrl, updateServerUrl }}>
       {children}
     </SocketContext.Provider>
   )

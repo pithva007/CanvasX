@@ -1,15 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useToast } from '@/hooks/useToast'
-import { Lock, Loader } from 'lucide-react'
+import { Lock, Loader, Settings, Server, Check, ChevronUp, ChevronDown } from 'lucide-react'
 
 export function JoinPage({ onJoinRoom }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { socket, connected } = useSocket()
+  const { socket, connected, serverUrl, updateServerUrl } = useSocket()
   const { setRoomId, setUserId } = useWhiteboard()
   const { addToast } = useToast()
+
+  const [showSettingsHint, setShowSettingsHint] = useState(false)
+  const [showServerSettings, setShowServerSettings] = useState(false)
+  const [tempServerUrl, setTempServerUrl] = useState(serverUrl)
+
+  useEffect(() => {
+    let timer
+    if (!connected) {
+      timer = setTimeout(() => {
+        setShowSettingsHint(true)
+      }, 3000)
+    } else {
+      setShowSettingsHint(false)
+      setShowServerSettings(false)
+    }
+    return () => clearTimeout(timer)
+  }, [connected])
 
   const handleJoin = async (e) => {
     e.preventDefault()
@@ -96,12 +113,77 @@ export function JoinPage({ onJoinRoom }) {
               </p>
             </div>
 
-            {/* Status */}
+            {/* Status & Server Settings */}
             {!connected && (
-              <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                <p className="text-sm text-yellow-200">
-                  Connecting to server...
-                </p>
+              <div className="space-y-3">
+                <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader className="w-4 h-4 text-yellow-600 animate-spin" />
+                    <p className="text-sm text-yellow-700 font-semibold">
+                      Connecting to server...
+                    </p>
+                  </div>
+                  {showSettingsHint && !showServerSettings && (
+                    <button
+                      type="button"
+                      onClick={() => setShowServerSettings(true)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-bold underline transition-colors"
+                    >
+                      Configure Server
+                    </button>
+                  )}
+                </div>
+
+                {/* Dynamic Server Configuration Card */}
+                {showServerSettings && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
+                        <Server className="w-4 h-4 text-slate-600" />
+                        <span>Server Connection Settings</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowServerSettings(false)}
+                        className="text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 leading-normal font-medium">
+                      If your backend is deployed under a different domain (e.g. on Render), enter its URL below to connect.
+                    </p>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={tempServerUrl}
+                        onChange={(e) => setTempServerUrl(e.target.value)}
+                        placeholder="https://your-backend.onrender.com"
+                        className="flex-1 text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateServerUrl(tempServerUrl)
+                          addToast('Reconnecting with new URL...', 'info')
+                        }}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Update
+                      </button>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+                      <span className="font-semibold">Current URL:</span>
+                      <code className="text-slate-600 font-mono select-all truncate max-w-[200px]" title={serverUrl}>
+                        {serverUrl}
+                      </code>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
