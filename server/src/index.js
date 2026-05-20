@@ -6,7 +6,7 @@ import dotenv from 'dotenv'
 import { v4 as uuidv4 } from 'uuid'
 import { RoomManager } from './rooms/RoomManager.js'
 import { setupSocketHandlers } from './socket/handlers.js'
-import { corsMiddleware, loggerMiddleware, errorHandler } from './middleware/common.js'
+import { corsMiddleware, loggerMiddleware, errorHandler, isOriginAllowed } from './middleware/common.js'
 
 dotenv.config()
 
@@ -28,7 +28,13 @@ app.use(express.static('public'))
 // Socket.IO setup with proper CORS
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigin,
+    origin: (origin, callback) => {
+      if (!origin || isOriginAllowed(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
