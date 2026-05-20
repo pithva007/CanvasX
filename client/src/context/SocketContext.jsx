@@ -11,13 +11,22 @@ export const useSocket = () => {
   return context
 }
 
+const cleanUrl = (url) => {
+  if (!url) return ''
+  let cleaned = url.trim()
+  cleaned = cleaned.replace(/\/+$/, '')
+  cleaned = cleaned.replace(/\/socket\.io$/i, '')
+  cleaned = cleaned.replace(/\/+$/, '')
+  return cleaned
+}
+
 export function SocketProvider({ children }) {
   const [serverUrl, setServerUrl] = useState(() => {
-    return (
+    const rawUrl =
       localStorage.getItem('drawtogether_server_url') ||
       import.meta.env.VITE_SOCKET_URL ||
       'http://localhost:3001'
-    )
+    return cleanUrl(rawUrl)
   })
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
@@ -30,6 +39,7 @@ export function SocketProvider({ children }) {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
+      transports: ['websocket', 'polling'],
     })
 
     newSocket.on('connect', () => {
@@ -53,9 +63,11 @@ export function SocketProvider({ children }) {
       formattedUrl = 'http://' + formattedUrl
     }
 
-    if (formattedUrl) {
-      localStorage.setItem('drawtogether_server_url', formattedUrl)
-      setServerUrl(formattedUrl)
+    const cleaned = cleanUrl(formattedUrl)
+
+    if (cleaned) {
+      localStorage.setItem('drawtogether_server_url', cleaned)
+      setServerUrl(cleaned)
       setConnected(false)
     }
   }
