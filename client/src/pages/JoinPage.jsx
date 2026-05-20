@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/useToast'
 import { Lock, Loader, Settings, Server, Check, ChevronUp, ChevronDown } from 'lucide-react'
 
 export function JoinPage({ onJoinRoom }) {
-  const [password, setPassword] = useState('')
+  const [password, setPassword] = useState('Drawing24')
   const [loading, setLoading] = useState(false)
   const { socket, connected, serverUrl, updateServerUrl } = useSocket()
   const { setRoomId, setUserId } = useWhiteboard()
