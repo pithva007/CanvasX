@@ -249,11 +249,15 @@ simultaneously (verified by an end-to-end two-browser test).
   you need durable boards.
 - **Single-node** — real horizontal scaling across multiple server instances
   requires the [Socket.IO Redis adapter](https://socket.io/docs/v4/redis-adapter/);
-  a single instance is assumed here.
-- **Reconnection** — after a dropped connection, Socket.IO reconnects with a new
-  socket id and the old room membership has already been released server-side, so
-  the client should rejoin the room to resume syncing. Automatic session recovery
-  is not yet implemented.
+  a single instance is assumed here. (Render free/starter runs one instance.)
+
+### Reconnection (handled)
+On hosts like Render the WebSocket can drop. Socket.IO reconnects with a **new
+socket id**, which loses the old server-side room membership. The client handles
+this: it retries reconnecting indefinitely, and on the manager's `reconnect`
+event it re-joins the room and **resyncs by union** — merging the room's current
+snapshot in and pushing its own document out — so drawing resumes without wiping
+either side's work. (Edits made while fully offline are pushed on reconnect.)
 
 ## 🌐 Deployment
 

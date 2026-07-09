@@ -10,7 +10,7 @@ import { Toast } from '@/components/Toast'
 import { LogOut, Copy, Check, Users } from 'lucide-react'
 
 export function WhiteboardPage({ onLeaveRoom }) {
-  const { socket, connected } = useSocket()
+  const { socket } = useSocket()
   const { roomId, userId, userName, password, users, seeding } = useWhiteboard()
   const { toasts, addToast } = useToast()
   const [copied, setCopied] = useState(false)
@@ -18,10 +18,10 @@ export function WhiteboardPage({ onLeaveRoom }) {
   useRoomUsers()
   const storeWithStatus = useSyncStore({
     socket,
-    connected,
     roomId,
     userId,
     userName,
+    password,
     seeding,
   })
 

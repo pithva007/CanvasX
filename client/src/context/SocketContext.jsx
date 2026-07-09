@@ -38,7 +38,9 @@ export function SocketProvider({ children }) {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      // Keep retrying forever — on hosts like Render the WebSocket can drop and
+      // giving up (the old default of 5) would permanently break sync.
+      reconnectionAttempts: Infinity,
       transports: ['websocket', 'polling'],
     })
 

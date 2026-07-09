@@ -71,7 +71,7 @@ socket.emit('room:join', {
   userId: 'socket-id',             // User's unique ID
   roomState: {
     roomId: 'room-password',
-    sessionId: 'session-uuid',
+    sessionId: ' ',
     users: [                        // Array of users in room
       {
         id: 'user-id',

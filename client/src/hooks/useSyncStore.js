@@ -45,13 +45,32 @@ const isEmptyDiff = (d) =>
     (!d.updated || !Object.keys(d.updated).length) &&
     (!d.removed || !Object.keys(d.removed).length))
 
+/** Merge a server snapshot INTO the store without wiping local-only records (union). */
+function mergeSnapshotIntoStore(store, snapshot) {
+  const records = snapshot && snapshot.store ? Object.values(snapshot.store) : []
+  if (records.length) store.mergeRemoteChanges(() => store.put(records))
+}
+
+/** Push the whole local document to the room as an "added" diff (union resync). */
+function pushWholeDocument(store, socket) {
+  const snap = store.getStoreSnapshot()
+  const added = snap && snap.store ? { ...snap.store } : {}
+  if (Object.keys(added).length) {
+    socket.emit('store:update', { changes: { added, updated: {}, removed: {} } })
+  }
+}
+
 /**
  * Real-time collaborative tldraw store synced over Socket.IO.
  *
  * Returns a TLStoreWithStatus: `{ status: 'loading' }` until the initial
  * document state is established, then `{ status: 'synced-remote', store }`.
+ *
+ * Survives reconnects: a dropped socket reconnects with a new id and loses its
+ * server-side room membership, so on reconnect we re-join the room and resync
+ * (merge the room snapshot in, push our document out) WITHOUT wiping local work.
  */
-export function useSyncStore({ socket, connected, roomId, userId, userName, seeding }) {
+export function useSyncStore({ socket, roomId, userId, userName, password, seeding }) {
   const store = useMemo(
     () => createTLStore({ shapeUtils: defaultShapeUtils, bindingUtils: defaultBindingUtils }),
     []
@@ -59,7 +78,10 @@ export function useSyncStore({ socket, connected, roomId, userId, userName, seed
   const [status, setStatus] = useState({ status: 'loading' })
 
   useEffect(() => {
-    if (!socket || !connected || !roomId || !seeding || !userId) return
+    // Note: intentionally NOT gated on a `connected` flag. Re-running this effect
+    // on every reconnect would reload the stale join-time snapshot and wipe the
+    // board. Reconnects are handled by the manager's `reconnect` event below.
+    if (!socket || !roomId || !seeding || !userId) return
 
     let disposed = false
     const cleanups = []
@@ -181,14 +203,33 @@ export function useSyncStore({ socket, connected, roomId, userId, userName, seed
     socket.on('presence:update', onPresenceUpdate)
     socket.on('presence:leave', onPresenceLeave)
 
+    // --- Reconnection: rejoin the room (new socket id => lost membership) and
+    //     resync by union — never wipe local work. ---
+    const onReconnect = () => {
+      socket.emit('room:join', { password, name: userName }, (resp) => {
+        if (disposed || !resp || !resp.success) return
+        if (resp.needsInit) {
+          // The room was empty when we came back: reseed it from our document.
+          socket.emit('store:init', { snapshot: store.getStoreSnapshot() })
+        } else if (resp.snapshot) {
+          // Room still had state: merge it in, then push ours so peers converge.
+          mergeSnapshotIntoStore(store, resp.snapshot)
+        }
+        pushWholeDocument(store, socket)
+      })
+    }
+    // Manager-level 'reconnect' fires only on a successful *re*connection.
+    socket.io.on('reconnect', onReconnect)
+
     return () => {
       disposed = true
       socket.off('store:update', onStoreUpdate)
       socket.off('presence:update', onPresenceUpdate)
       socket.off('presence:leave', onPresenceLeave)
+      socket.io.off('reconnect', onReconnect)
       cleanups.forEach((fn) => fn())
     }
-  }, [socket, connected, roomId, userId, userName, seeding, store])
+  }, [socket, roomId, userId, userName, password, seeding, store])
 
   return status
 }
