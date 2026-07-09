@@ -6,29 +6,22 @@ import { JoinPage } from '@/pages/JoinPage'
 import { WhiteboardPage } from '@/pages/WhiteboardPage'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
+function Routes() {
+  const [page, setPage] = useState('join')
+
+  return page === 'join' ? (
+    <JoinPage onJoinRoom={() => setPage('whiteboard')} />
+  ) : (
+    <WhiteboardPage onLeaveRoom={() => setPage('join')} />
+  )
+}
+
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('join')
-  const [roomId, setRoomId] = useState(null)
-
-  const handleJoinRoom = (newRoomId) => {
-    setRoomId(newRoomId)
-    setCurrentPage('whiteboard')
-  }
-
-  const handleLeaveRoom = () => {
-    setRoomId(null)
-    setCurrentPage('join')
-  }
-
   return (
     <ErrorBoundary>
       <SocketProvider>
         <WhiteboardProvider>
-          {currentPage === 'join' ? (
-            <JoinPage onJoinRoom={handleJoinRoom} />
-          ) : (
-            <WhiteboardPage roomId={roomId} onLeaveRoom={handleLeaveRoom} />
-          )}
+          <Routes />
         </WhiteboardProvider>
       </SocketProvider>
     </ErrorBoundary>

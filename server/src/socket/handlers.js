@@ -1,282 +1,240 @@
-import { v4 as uuidv4 } from 'uuid'
+import { validateRoomPassword, sanitizeInput } from '../utils/validators.js'
 
 /**
- * Setup all Socket.IO event handlers
+ * Setup all Socket.IO event handlers.
+ *
+ * Collaboration model (tldraw "DIY multiplayer"):
+ *  - The room owns the authoritative document snapshot.
+ *  - The first user into an empty room is the *initializer*: it seeds the
+ *    snapshot via `store:init`. Everyone else either receives the current
+ *    snapshot immediately (room already seeded) or waits for `store:seeded`
+ *    and then pulls the current snapshot with `store:request-snapshot`.
+ *  - Document edits flow as `store:update` diffs, applied to the room snapshot
+ *    and relayed to peers. Presence (cursors) flows as `presence:update` and is
+ *    relayed but never stored.
  */
 export function setupSocketHandlers(io, roomManager) {
   io.on('connection', (socket) => {
-    console.log(`[Socket] User connected: ${socket.id}`)
+    console.log(`[Socket] Connected: ${socket.id}`)
 
-    let currentRoomId = null
-    let currentUserId = null
+    let currentRoom = null // Room instance
+    let currentUserId = null // === socket.id
+
+    const usersPayload = (room) =>
+      room.getUsers().map((u) => ({ id: u.id, name: u.name, color: u.color }))
 
     /**
-     * Room: Join room with password
+     * Promote a new initializer if the current one leaves before seeding.
      */
-    socket.on('room:join', (data, callback) => {
+    const handleInitializerDeparture = (room, departingId) => {
+      if (!room || room.isSeeded() || room.isEmpty()) return
+      if (room.initializerId && room.initializerId !== departingId) return
+
+      const next = room.getUsers()[0]
+      if (next) {
+        room.initializerId = next.id
+        io.to(next.id).emit('store:please-init')
+        console.log(`[Room ${room.sessionId}] Promoted ${next.id} to initializer`)
+      }
+    }
+
+    /**
+     * Room: join (create-or-join by password, or join an existing sessionId).
+     */
+    socket.on('room:join', (data = {}, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
       try {
-        const { password, roomId } = data
+        const { password, roomId, name } = data
 
-        // If roomId provided, join existing room
-        if (roomId) {
-          const room = roomManager.getRoomBySessionId(roomId)
-          if (!room) {
-            return callback({
-              success: false,
-              message: 'Room not found',
-            })
-          }
-
-          // Check if room password matches
-          if (room.password !== password) {
-            return callback({
-              success: false,
-              message: 'Invalid password',
-            })
-          }
-
-          currentRoomId = roomId
-          currentUserId = socket.id
-        } else if (password) {
-          // Create or get room by password
-          const userId = socket.id
-          const user = {
-            id: userId,
-            socketId: socket.id,
-            name: `User-${userId.substring(0, 6)}`,
-            connectedAt: new Date(),
-            cursor: { x: 0, y: 0 },
-          }
-
-          const result = roomManager.addUserToRoom(password, user)
-
-          if (!result.success) {
-            return callback({
-              success: false,
-              message: result.message,
-            })
-          }
-
-          currentRoomId = result.roomId
-          currentUserId = userId
-        } else {
-          return callback({
-            success: false,
-            message: 'Password or roomId required',
-          })
+        const validation = validateRoomPassword(password)
+        if (!validation.valid && !roomId) {
+          return respond({ success: false, message: validation.error })
         }
 
-        // Join socket to room
-        socket.join(currentRoomId)
+        let room
+        if (roomId) {
+          room = roomManager.getRoomBySessionId(roomId)
+          if (!room) return respond({ success: false, message: 'Room not found' })
+          if (room.password !== password) {
+            return respond({ success: false, message: 'Invalid password' })
+          }
+          if (room.isFull()) {
+            return respond({ success: false, message: 'Room is full' })
+          }
+        } else {
+          const existing = roomManager.getRoomByPassword(password)
+          if (existing && existing.isFull()) {
+            return respond({ success: false, message: 'Room is full' })
+          }
+        }
 
-        // Notify others in room
-        socket.to(currentRoomId).emit('room:user-joined', {
-          user: {
-            id: currentUserId,
-            name: `User-${currentUserId.substring(0, 6)}`,
-            connectedAt: new Date(),
-          },
-          userCount: roomManager.getRoomState(currentRoomId)?.users.length || 1,
+        const userId = socket.id
+        const displayName = sanitizeInput(name) || `User-${userId.substring(0, 5)}`
+        const user = {
+          id: userId,
+          name: displayName,
+          color: colorForId(userId),
+          connectedAt: new Date(),
+        }
+
+        const result = roomManager.addUserToRoom(password, user)
+        if (!result.success) {
+          return respond({ success: false, message: result.message })
+        }
+
+        room = result.room
+        currentRoom = room
+        currentUserId = userId
+        socket.join(room.sessionId)
+
+        // Decide seeding role.
+        let needsInit = false
+        let snapshot = null
+        if (room.isSeeded()) {
+          snapshot = room.snapshot
+        } else if (!room.initializerId) {
+          room.initializerId = userId
+          needsInit = true
+        }
+        // else: someone is already initializing -> this client waits for `store:seeded`.
+
+        // Notify existing members.
+        socket.to(room.sessionId).emit('room:user-joined', {
+          user: { id: user.id, name: user.name, color: user.color },
+          users: usersPayload(room),
         })
 
-        // Send current room state to user
-        const roomState = roomManager.getRoomState(currentRoomId)
-        callback({
+        respond({
           success: true,
-          roomId: currentRoomId,
-          userId: currentUserId,
-          roomState: roomState,
+          roomId: room.sessionId,
+          userId,
+          name: displayName,
+          users: usersPayload(room),
+          needsInit,
+          snapshot,
         })
 
-        console.log(`[Room] User ${currentUserId} joined room ${currentRoomId}`)
+        console.log(
+          `[Room ${room.sessionId}] ${displayName} joined ` +
+            `(${room.users.size}/${room.maxUsers}, needsInit=${needsInit})`
+        )
       } catch (error) {
         console.error('[Socket Error] room:join:', error)
-        callback({
-          success: false,
-          message: 'Failed to join room',
-        })
+        respond({ success: false, message: 'Failed to join room' })
       }
     })
 
     /**
-     * Room: Leave room
+     * Store: initializer seeds the authoritative snapshot.
      */
-    socket.on('room:leave', (data) => {
+    socket.on('store:init', (data = {}) => {
       try {
-        if (!currentRoomId) return
+        if (!currentRoom) return
+        if (currentRoom.isSeeded()) return // first-writer-wins
+        if (currentRoom.initializerId && currentRoom.initializerId !== currentUserId) return
+        if (!data.snapshot || !data.snapshot.store) return
 
-        const result = roomManager.removeUserFromRoom(currentUserId)
+        currentRoom.setSnapshot(data.snapshot)
+        socket.to(currentRoom.sessionId).emit('store:seeded')
+        console.log(`[Room ${currentRoom.sessionId}] Seeded by ${currentUserId}`)
+      } catch (error) {
+        console.error('[Socket Error] store:init:', error)
+      }
+    })
 
-        socket.leave(currentRoomId)
-        socket.to(currentRoomId).emit('room:user-left', {
+    /**
+     * Store: a waiting client pulls the current authoritative snapshot.
+     */
+    socket.on('store:request-snapshot', (_data, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      try {
+        respond({ snapshot: currentRoom ? currentRoom.snapshot : null })
+      } catch (error) {
+        console.error('[Socket Error] store:request-snapshot:', error)
+        respond({ snapshot: null })
+      }
+    })
+
+    /**
+     * Store: relay a document diff and fold it into the room snapshot.
+     */
+    socket.on('store:update', (data = {}) => {
+      try {
+        if (!currentRoom || !data.changes) return
+        currentRoom.applyDiff(data.changes)
+        socket.to(currentRoom.sessionId).emit('store:update', {
+          changes: data.changes,
           userId: currentUserId,
-          userCount: roomManager.getRoomState(currentRoomId)?.users.length || 0,
         })
-
-        console.log(`[Room] User ${currentUserId} left room ${currentRoomId}`)
-
-        currentRoomId = null
-        currentUserId = null
       } catch (error) {
-        console.error('[Socket Error] room:leave:', error)
+        console.error('[Socket Error] store:update:', error)
       }
     })
 
     /**
-     * Drawing: Update drawing
+     * Presence: relay a cursor/presence record (never stored).
      */
-    socket.on('draw:update', (data) => {
+    socket.on('presence:update', (data = {}) => {
       try {
-        if (!currentRoomId) return
-
-        roomManager.updateRoomDrawing(currentRoomId, data)
-
-        // Broadcast to room
-        socket.to(currentRoomId).emit('draw:update', {
-          ...data,
+        if (!currentRoom || !data.presence) return
+        socket.to(currentRoom.sessionId).emit('presence:update', {
+          presence: data.presence,
           userId: currentUserId,
-          timestamp: Date.now(),
         })
       } catch (error) {
-        console.error('[Socket Error] draw:update:', error)
+        console.error('[Socket Error] presence:update:', error)
       }
     })
 
     /**
-     * Drawing: Clear canvas
+     * Room: leave.
      */
-    socket.on('draw:clear', (data) => {
-      try {
-        if (!currentRoomId) return
-
-        roomManager.clearRoomDrawing(currentRoomId)
-
-        // Broadcast to room
-        socket.to(currentRoomId).emit('draw:clear', {
-          userId: currentUserId,
-          timestamp: Date.now(),
-        })
-      } catch (error) {
-        console.error('[Socket Error] draw:clear:', error)
-      }
-    })
+    socket.on('room:leave', () => leaveRoom())
 
     /**
-     * Cursor: Move cursor
+     * Disconnect.
      */
-    socket.on('cursor:move', (data) => {
-      try {
-        if (!currentRoomId) return
-
-        socket.to(currentRoomId).emit('cursor:move', {
-          userId: currentUserId,
-          position: data.position || { x: 0, y: 0 },
-          timestamp: Date.now(),
-        })
-      } catch (error) {
-        console.error('[Socket Error] cursor:move:', error)
-      }
+    socket.on('disconnect', (reason) => {
+      leaveRoom()
+      console.log(`[Socket] Disconnected: ${socket.id} (${reason})`)
     })
 
-    /**
-     * Canvas: Update zoom
-     */
-    socket.on('canvas:zoom', (data) => {
-      try {
-        if (!currentRoomId) return
-
-        socket.to(currentRoomId).emit('canvas:zoom', {
-          zoom: data.zoom,
-          userId: currentUserId,
-          timestamp: Date.now(),
-        })
-      } catch (error) {
-        console.error('[Socket Error] canvas:zoom:', error)
-      }
-    })
-
-    /**
-     * Canvas: Update pan
-     */
-    socket.on('canvas:pan', (data) => {
-      try {
-        if (!currentRoomId) return
-
-        socket.to(currentRoomId).emit('canvas:pan', {
-          pan: data.pan || { x: 0, y: 0 },
-          userId: currentUserId,
-          timestamp: Date.now(),
-        })
-      } catch (error) {
-        console.error('[Socket Error] canvas:pan:', error)
-      }
-    })
-
-    /**
-     * File: Upload image
-     */
-    socket.on('file:upload', (data) => {
-      try {
-        if (!currentRoomId) return
-
-        socket.to(currentRoomId).emit('file:upload', {
-          fileData: data.fileData,
-          fileName: data.fileName,
-          userId: currentUserId,
-          timestamp: Date.now(),
-        })
-      } catch (error) {
-        console.error('[Socket Error] file:upload:', error)
-      }
-    })
-
-    /**
-     * Room: Get current state
-     */
-    socket.on('room:get-state', (data, callback) => {
-      try {
-        if (!currentRoomId) {
-          return callback(null)
-        }
-
-        const roomState = roomManager.getRoomState(currentRoomId)
-        callback(roomState)
-      } catch (error) {
-        console.error('[Socket Error] room:get-state:', error)
-        callback(null)
-      }
-    })
-
-    /**
-     * Disconnect handler
-     */
-    socket.on('disconnect', () => {
-      try {
-        if (currentRoomId && currentUserId) {
-          const result = roomManager.removeUserFromRoom(currentUserId)
-
-          // Notify others in room
-          socket.to(currentRoomId).emit('room:user-left', {
-            userId: currentUserId,
-            userCount: roomManager.getRoomState(currentRoomId)?.users.length || 0,
-          })
-
-          console.log(
-            `[Room] User ${currentUserId} disconnected from room ${currentRoomId}`
-          )
-        }
-
-        console.log(`[Socket] User disconnected: ${socket.id}`)
-      } catch (error) {
-        console.error('[Socket Error] disconnect:', error)
-      }
-    })
-
-    /**
-     * Error handler
-     */
     socket.on('error', (error) => {
       console.error('[Socket Error]:', error)
     })
+
+    function leaveRoom() {
+      if (!currentRoom || !currentUserId) return
+      const room = currentRoom
+      const userId = currentUserId
+      const wasInitializer = room.initializerId === userId
+
+      const result = roomManager.removeUserFromRoom(userId)
+      socket.leave(room.sessionId)
+
+      if (result && !result.roomDeleted) {
+        socket.to(room.sessionId).emit('room:user-left', {
+          userId,
+          users: usersPayload(room),
+        })
+        socket.to(room.sessionId).emit('presence:leave', { userId })
+        if (wasInitializer) handleInitializerDeparture(room, userId)
+      }
+
+      console.log(`[Room ${room.sessionId}] ${userId} left`)
+      currentRoom = null
+      currentUserId = null
+    }
   })
+}
+
+const PRESENCE_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA94D',
+  '#9775FA', '#38D9A9', '#F783AC', '#748FFC',
+]
+
+function colorForId(id) {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0
+  return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length]
 }

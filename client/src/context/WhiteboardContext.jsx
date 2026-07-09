@@ -10,38 +10,32 @@ export const useWhiteboard = () => {
   return context
 }
 
+/**
+ * Session-level room state. Drawing state itself lives in the tldraw store
+ * (see useSyncStore); this context only tracks room identity, the local user,
+ * the roster of collaborators, and the initial sync payload from `room:join`.
+ */
 export function WhiteboardProvider({ children }) {
   const [roomId, setRoomId] = useState(null)
+  const [password, setPassword] = useState(null)
   const [userId, setUserId] = useState(null)
-  const [drawing, setDrawing] = useState({})
-  const [darkMode, setDarkMode] = useState(true)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [selectedTool, setSelectedTool] = useState('draw')
-  const [strokeColor, setStrokeColor] = useState('#000000')
-  const [fillColor, setFillColor] = useState('#ffffff')
-  const [strokeWidth, setStrokeWidth] = useState(2)
+  const [userName, setUserName] = useState('')
   const [users, setUsers] = useState([])
-  const [cursors, setCursors] = useState({})
-
-  const updateDrawing = useCallback((updates) => {
-    setDrawing((prev) => ({ ...prev, ...updates }))
-  }, [])
+  const [seeding, setSeeding] = useState(null) // { needsInit, snapshot } from room:join
 
   const addUser = useCallback((user) => {
     setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user])
   }, [])
 
-  const removeUser = useCallback((userId) => {
-    setUsers((prev) => prev.filter((u) => u.id !== userId))
+  const removeUser = useCallback((id) => {
+    setUsers((prev) => prev.filter((u) => u.id !== id))
   }, [])
 
-  const updateCursor = useCallback((userId, position) => {
-    setCursors((prev) => ({ ...prev, [userId]: position }))
-  }, [])
-
-  const clearCanvas = useCallback(() => {
-    setDrawing({})
+  const resetRoom = useCallback(() => {
+    setRoomId(null)
+    setPassword(null)
+    setUsers([])
+    setSeeding(null)
   }, [])
 
   return (
@@ -49,30 +43,19 @@ export function WhiteboardProvider({ children }) {
       value={{
         roomId,
         setRoomId,
+        password,
+        setPassword,
         userId,
         setUserId,
-        drawing,
-        updateDrawing,
-        darkMode,
-        setDarkMode,
-        zoom,
-        setZoom,
-        pan,
-        setPan,
-        selectedTool,
-        setSelectedTool,
-        strokeColor,
-        setStrokeColor,
-        fillColor,
-        setFillColor,
-        strokeWidth,
-        setStrokeWidth,
+        userName,
+        setUserName,
         users,
+        setUsers,
         addUser,
         removeUser,
-        cursors,
-        updateCursor,
-        clearCanvas,
+        seeding,
+        setSeeding,
+        resetRoom,
       }}
     >
       {children}

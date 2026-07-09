@@ -1,11 +1,11 @@
 # DrawTogether - Real-time Collaborative Whiteboard
 
-A production-ready real-time collaborative whiteboard application where two users can join the same drawing room using only a password and draw together live on an infinite canvas.
+A production-ready real-time collaborative whiteboard application where multiple users can join the same drawing room using only a password and draw together live on an infinite canvas. Drawing, shapes, text and cursors sync in real time via tldraw's multiplayer store over Socket.IO.
 
 ## 🎨 Features
 
 ### Core Features
-- ✨ **Real-time Collaboration** - Live drawing synchronization between two users
+- ✨ **Real-time Collaboration** - Live drawing synchronization across all users in a room
 - 🔐 **Password-based Rooms** - Simple room creation and joining with password
 - 🎯 **Infinite Canvas** - Unlimited drawing space with zoom and pan
 - 🎨 **Complete Drawing Tools** - Pencil, eraser, shapes, text, and more
@@ -144,9 +144,9 @@ npm run dev
 - Share password with someone else to collaborate
 
 ### Room Rules
-- Maximum 2 users per room
+- Configurable capacity per room (default **50**, set via `MAX_USERS_PER_ROOM`)
 - Any password creates or joins a room
-- Room persists as long as at least one user is connected
+- Room (and its drawing) persists as long as at least one user is connected
 - Empty rooms are cleaned up after 1 hour of inactivity
 - Password is not stored persistently (session only)
 
@@ -157,6 +157,8 @@ npm run dev
 PORT=3001
 NODE_ENV=development
 CLIENT_URL=http://localhost:5173
+# Max users allowed in a single room (default 50)
+MAX_USERS_PER_ROOM=50
 ```
 
 ### Frontend (.env)
@@ -172,14 +174,14 @@ Drawing/
 ├── client/                    # React frontend
 │   ├── src/
 │   │   ├── components/       # React components
-│   │   │   ├── Toolbar.jsx
-│   │   │   ├── UserPresence.jsx
+│   │   │   ├── ErrorBoundary.jsx
 │   │   │   └── Toast.jsx
 │   │   ├── context/          # Context providers
-│   │   │   ├── SocketContext.jsx
-│   │   │   └── WhiteboardContext.jsx
+│   │   │   ├── SocketContext.jsx      # Socket.IO connection
+│   │   │   └── WhiteboardContext.jsx  # Room/user session state
 │   │   ├── hooks/            # Custom hooks
-│   │   │   ├── useSocketEvents.js
+│   │   │   ├── useSyncStore.js        # tldraw multiplayer store sync
+│   │   │   ├── useSocketEvents.js     # room roster updates
 │   │   │   └── useToast.js
 │   │   ├── pages/            # Page components
 │   │   │   ├── JoinPage.jsx
@@ -213,29 +215,45 @@ Drawing/
 
 ### Room System
 - Rooms identified by password
-- Auto-generate unique session ID internally
-- Store room state server-side
-- Clean up inactive rooms
-- Max 2 users validation
+- Auto-generated unique session ID internally
+- Authoritative document snapshot stored server-side (in memory)
+- Inactive rooms cleaned up automatically
+- Configurable room capacity (`MAX_USERS_PER_ROOM`)
 
-### Real-time Sync
-- Socket.IO event broadcasting
-- Efficient delta updates
-- Conflict-free state management
-- Automatic reconnection
-- Queue pending updates
+### Real-time Sync (tldraw DIY multiplayer)
+The whiteboard uses tldraw's document store synced over Socket.IO:
 
-### Drawing Sync
-- Canvas state mirroring
-- User action broadcasting
-- Smooth collaborative editing
-- Undo/Redo synchronization
+1. **Seeding handshake** — the first user into an empty room is the *initializer*
+   and seeds the room's document snapshot (`store:init`). Everyone else either
+   receives the current snapshot on join, or (if a seed is in progress) waits for
+   `store:seeded` and pulls the up-to-date snapshot (`store:request-snapshot`).
+   If the initializer disconnects before seeding, another user is promoted.
+2. **Live edits** — local document changes (`store.listen`, `source: 'user'`) are
+   emitted as diffs (`store:update`), folded into the room snapshot so late
+   joiners stay current, and applied on peers via `store.mergeRemoteChanges`
+   (which tags them `remote`, preventing rebroadcast loops).
+3. **Presence** — cursors flow as `presence:update` (throttled, last-write-wins)
+   and are relayed but never persisted; `presence:leave` removes a cursor.
+
+This design converges correctly even when two users open the same fresh room
+simultaneously (verified by an end-to-end two-browser test).
 
 ### User Presence
-- Live cursor tracking
-- User join/leave notifications
-- Connection status indicators
-- Waiting status messages
+- Live cursor tracking with names (tldraw collaborator cursors)
+- User join/leave updates the room roster
+- Live user count in the room bar
+
+## ⚠️ Known Limitations
+- **In-memory only** — a room's drawing lives in server memory and is lost when
+  the room empties (matches the no-database design). Add a persistence layer if
+  you need durable boards.
+- **Single-node** — real horizontal scaling across multiple server instances
+  requires the [Socket.IO Redis adapter](https://socket.io/docs/v4/redis-adapter/);
+  a single instance is assumed here.
+- **Reconnection** — after a dropped connection, Socket.IO reconnects with a new
+  socket id and the old room membership has already been released server-side, so
+  the client should rejoin the room to resume syncing. Automatic session recovery
+  is not yet implemented.
 
 ## 🌐 Deployment
 

@@ -2,13 +2,21 @@ import { useState, useEffect } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useToast } from '@/hooks/useToast'
-import { Lock, Loader, Settings, Server, Check, ChevronUp, ChevronDown } from 'lucide-react'
+import { Lock, Loader, Server, Check, ChevronUp, User } from 'lucide-react'
 
 export function JoinPage({ onJoinRoom }) {
+  const [name, setName] = useState(() => localStorage.getItem('drawtogether_name') || '')
   const [password, setPassword] = useState('Drawing24')
   const [loading, setLoading] = useState(false)
   const { socket, connected, serverUrl, updateServerUrl } = useSocket()
-  const { setRoomId, setUserId } = useWhiteboard()
+  const {
+    setRoomId,
+    setPassword: setRoomPassword,
+    setUserId,
+    setUserName,
+    setUsers,
+    setSeeding,
+  } = useWhiteboard()
   const { addToast } = useToast()
 
   const [showSettingsHint, setShowSettingsHint] = useState(false)
@@ -42,17 +50,23 @@ export function JoinPage({ onJoinRoom }) {
     }
 
     setLoading(true)
+    const trimmedName = name.trim()
+    localStorage.setItem('drawtogether_name', trimmedName)
 
-    socket.emit('room:join', { password }, (response) => {
+    socket.emit('room:join', { password, name: trimmedName }, (response) => {
       setLoading(false)
 
-      if (response.success) {
+      if (response && response.success) {
         setRoomId(response.roomId)
+        setRoomPassword(password)
         setUserId(response.userId)
+        setUserName(response.name)
+        setUsers(response.users || [])
+        setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         addToast('Room joined successfully!', 'success')
         onJoinRoom(response.roomId)
       } else {
-        addToast(response.message || 'Failed to join room', 'error')
+        addToast((response && response.message) || 'Failed to join room', 'error')
       }
     })
   }
@@ -91,6 +105,29 @@ export function JoinPage({ onJoinRoom }) {
         {/* Main Card */}
         <div className="bg-white/95 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
           <form onSubmit={handleJoin} className="space-y-6">
+            {/* Name Input */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-800 mb-3">
+                Your Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your display name"
+                  maxLength={40}
+                  disabled={!connected || loading}
+                  className="input input pl-10 bg-white border-2 border-slate-300 text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  autoFocus
+                />
+              </div>
+              <p className="text-xs text-slate-600 mt-2 font-medium">
+                Shown to collaborators on your cursor
+              </p>
+            </div>
+
             {/* Password Input */}
             <div>
               <label className="block text-sm font-semibold text-slate-800 mb-3">
@@ -105,11 +142,10 @@ export function JoinPage({ onJoinRoom }) {
                   placeholder="Enter room password"
                   disabled={!connected || loading}
                   className="input input pl-10 bg-white border-2 border-slate-300 text-slate-900 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  autoFocus
                 />
               </div>
               <p className="text-xs text-slate-600 mt-2 font-medium">
-                Use any password to create or join a room
+                Share this password so others can join the same room
               </p>
             </div>
 
@@ -224,7 +260,7 @@ export function JoinPage({ onJoinRoom }) {
 
         {/* Footer */}
         <p className="text-center text-slate-600 text-xs mt-8 font-semibold">
-          Maximum 2 users per room
+          Anyone with the password can join and draw together
         </p>
       </div>
     </div>

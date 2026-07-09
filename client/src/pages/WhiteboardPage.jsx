@@ -1,121 +1,93 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
-import { useSocketEvents } from '@/hooks/useSocketEvents'
+import { useRoomUsers } from '@/hooks/useSocketEvents'
+import { useSyncStore } from '@/hooks/useSyncStore'
 import { useToast } from '@/hooks/useToast'
 import { Tldraw } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { Toolbar } from '@/components/Toolbar'
-import { UserPresence } from '@/components/UserPresence'
 import { Toast } from '@/components/Toast'
-import { Download, LogOut } from 'lucide-react'
+import { LogOut, Copy, Check, Users } from 'lucide-react'
 
-export function WhiteboardPage({ roomId: initialRoomId, onLeaveRoom }) {
+export function WhiteboardPage({ onLeaveRoom }) {
   const { socket, connected } = useSocket()
-  const { roomId, userId, users } = useWhiteboard()
+  const { roomId, userId, userName, password, users, seeding } = useWhiteboard()
   const { toasts, addToast } = useToast()
-  const tlDrawRef = useRef(null)
-  const [appState, setAppState] = useState(null)
+  const [copied, setCopied] = useState(false)
 
-  useSocketEvents()
-
-  useEffect(() => {
-    if (!socket || !connected) return
-
-    // Join room with socket
-    socket.emit('room:join', { roomId }, (response) => {
-      if (!response.success) {
-        addToast(response.message || 'Failed to join room', 'error')
-      }
-    })
-
-    return () => {
-      socket.emit('room:leave', { roomId })
-    }
-  }, [socket, connected, roomId])
-
-  const handleExport = async (format) => {
-    if (!tlDrawRef.current) return
-
-    try {
-      if (format === 'png') {
-        // Export as PNG
-        const canvas = tlDrawRef.current.getCanvas?.()
-        if (canvas) {
-          const link = document.createElement('a')
-          link.href = canvas.toDataURL('image/png')
-          link.download = `whiteboard-${Date.now()}.png`
-          link.click()
-          addToast('Exported as PNG', 'success')
-        }
-      } else if (format === 'json') {
-        // Export as JSON
-        const data = JSON.stringify(appState, null, 2)
-        const blob = new Blob([data], { type: 'application/json' })
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = `whiteboard-${Date.now()}.json`
-        link.click()
-        addToast('Exported as JSON', 'success')
-      }
-    } catch (error) {
-      addToast('Export failed', 'error')
-    }
-  }
+  useRoomUsers()
+  const storeWithStatus = useSyncStore({
+    socket,
+    connected,
+    roomId,
+    userId,
+    userName,
+    seeding,
+  })
 
   const handleLeave = () => {
-    if (socket) {
-      socket.emit('room:leave', { roomId })
-    }
+    if (socket) socket.emit('room:leave')
     onLeaveRoom?.()
   }
 
+  const copyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(password || '')
+      setCopied(true)
+      addToast('Room password copied', 'success')
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      addToast('Could not copy password', 'error')
+    }
+  }
+
   return (
-    <div className="relative w-full h-screen bg-white dark:bg-dark-900 flex overflow-hidden">
-      {/* Tldraw Canvas */}
-      <div className="flex-1">
-        <Tldraw ref={tlDrawRef} />
-      </div>
+    <div className="relative w-full h-screen overflow-hidden bg-white">
+      {/* tldraw provides the full drawing UI (tools, styles, export, zoom). */}
+      <Tldraw
+        store={storeWithStatus}
+        onMount={(editor) => {
+          // Escape hatch for debugging / automation.
+          if (typeof window !== 'undefined') window.editor = editor
+        }}
+      />
 
-      {/* Toolbar */}
-      <Toolbar onExport={handleExport} />
-
-      {/* User Presence */}
-      <UserPresence users={users} currentUserId={userId} />
-
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/10 to-transparent backdrop-blur-sm pointer-events-none" />
-
-      {/* Room Info & Controls */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
-        <div className="glass px-4 py-2 rounded-lg pointer-events-auto">
-          <p className="text-sm text-white font-medium">Room: {roomId}</p>
-          <p className="text-xs text-gray-300">
-            {users.length}/2 users connected
-          </p>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-2 pointer-events-auto">
+      {/* Room bar (top-right corner, out of tldraw's default UI zones). */}
+      <div className="absolute top-2 right-2 z-[500] flex items-center gap-2 pointer-events-auto">
         <button
-          onClick={() => handleExport('png')}
-          className="btn-secondary p-2 rounded-lg flex items-center gap-2"
-          title="Export as PNG"
+          onClick={copyPassword}
+          title="Copy room password to share"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg hover:bg-slate-900 transition-colors"
         >
-          <Download className="w-4 h-4" />
+          <span className="text-slate-400">Room</span>
+          <span className="font-semibold">{password}</span>
+          {copied ? (
+            <Check className="w-4 h-4 text-green-400" />
+          ) : (
+            <Copy className="w-4 h-4 text-slate-300" />
+          )}
         </button>
+
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg"
+          title={users.map((u) => u.name).join(', ')}
+        >
+          <Users className="w-4 h-4 text-slate-300" />
+          <span>{Math.max(users.length, 1)}</span>
+        </div>
+
         <button
           onClick={handleLeave}
-          className="btn-secondary p-2 rounded-lg flex items-center gap-2"
           title="Leave room"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-sm font-medium shadow-lg hover:bg-red-600 transition-colors"
         >
           <LogOut className="w-4 h-4" />
+          Leave
         </button>
       </div>
 
-      {/* Toast Container */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
+      {/* Toasts */}
+      <div className="fixed bottom-4 right-4 z-[600] space-y-2 pointer-events-none">
         {toasts.map((toast) => (
           <Toast key={toast.id} message={toast.message} type={toast.type} />
         ))}

@@ -2,69 +2,27 @@ import { useEffect } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
 
-export function useSocketEvents() {
+/**
+ * Keeps the collaborator roster in sync with the server. The initial roster is
+ * seeded from the room:join response (in JoinPage); this hook applies the
+ * incremental join/leave events. Drawing and cursor sync live in useSyncStore.
+ */
+export function useRoomUsers() {
   const { socket, connected } = useSocket()
-  const {
-    roomId,
-    userId,
-    updateDrawing,
-    addUser,
-    removeUser,
-    updateCursor,
-    setZoom,
-    setPan,
-  } = useWhiteboard()
+  const { roomId, addUser, removeUser } = useWhiteboard()
 
   useEffect(() => {
     if (!socket || !connected || !roomId) return
 
-    // Room events
-    socket.on('room:user-joined', (data) => {
-      addUser(data.user)
-    })
+    const onJoined = (data) => data?.user && addUser(data.user)
+    const onLeft = (data) => data?.userId && removeUser(data.userId)
 
-    socket.on('room:user-left', (data) => {
-      removeUser(data.userId)
-    })
-
-    socket.on('room:full', () => {
-      // Handle room full error
-    })
-
-    // Drawing events
-    socket.on('draw:update', (data) => {
-      updateDrawing(data)
-    })
-
-    socket.on('draw:clear', () => {
-      // Clear canvas
-    })
-
-    // Cursor events
-    socket.on('cursor:move', (data) => {
-      updateCursor(data.userId, data.position)
-    })
-
-    // Canvas state events
-    socket.on('canvas:zoom', (data) => {
-      setZoom(data.zoom)
-    })
-
-    socket.on('canvas:pan', (data) => {
-      setPan(data.pan)
-    })
+    socket.on('room:user-joined', onJoined)
+    socket.on('room:user-left', onLeft)
 
     return () => {
-      socket.off('room:user-joined')
-      socket.off('room:user-left')
-      socket.off('room:full')
-      socket.off('draw:update')
-      socket.off('draw:clear')
-      socket.off('cursor:move')
-      socket.off('canvas:zoom')
-      socket.off('canvas:pan')
+      socket.off('room:user-joined', onJoined)
+      socket.off('room:user-left', onLeft)
     }
-  }, [socket, connected, roomId, userId])
-
-  return socket
+  }, [socket, connected, roomId, addUser, removeUser])
 }
