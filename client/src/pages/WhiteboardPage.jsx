@@ -42,7 +42,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-white">
+    <div className="fixed inset-0 overflow-hidden bg-white">
       {/* tldraw provides the full drawing UI (tools, styles, export, zoom). */}
       <Tldraw
         store={storeWithStatus}
@@ -57,9 +57,9 @@ export function WhiteboardPage({ onLeaveRoom }) {
         <button
           onClick={copyPassword}
           title="Copy room password to share"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg hover:bg-slate-900 transition-colors"
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg hover:bg-slate-900 transition-colors"
         >
-          <span className="text-slate-400">Room</span>
+          <span className="text-slate-400 hidden sm:inline">Room</span>
           <span className="font-semibold">{password}</span>
           {copied ? (
             <Check className="w-4 h-4 text-green-400" />
@@ -69,7 +69,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
         </button>
 
         <div
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-slate-900/85 text-white text-sm font-medium shadow-lg"
           title={users.map((u) => u.name).join(', ')}
         >
           <Users className="w-4 h-4 text-slate-300" />
@@ -79,10 +79,10 @@ export function WhiteboardPage({ onLeaveRoom }) {
         <button
           onClick={handleLeave}
           title="Leave room"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/90 text-white text-sm font-medium shadow-lg hover:bg-red-600 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-red-600/90 text-white text-sm font-medium shadow-lg hover:bg-red-600 transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Leave
+          <span className="hidden sm:inline">Leave</span>
         </button>
       </div>
 
