@@ -41,6 +41,25 @@ function playSonarBeep() {
 }
 
 /**
+ * Safe Canvas rounded-rect renderer with graceful fallback using arcTo
+ * for older browsers/runtimes that lack native CanvasRenderingContext2D.roundRect
+ */
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, width, height, radius)
+    return
+  }
+
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + width, y, x + width, y + height, r)
+  ctx.arcTo(x + width, y + height, x, y + height, r)
+  ctx.arcTo(x, y + height, x, y, r)
+  ctx.arcTo(x, y, x + width, y, r)
+  ctx.closePath()
+}
+
+/**
  * LaserAndPingOverlay
  *
  * Renders:
@@ -462,11 +481,7 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
 
         // Badge background
         ctx.beginPath()
-        if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(badgeX, badgeY - badgeHeight, badgeWidth, badgeHeight, 11)
-        } else {
-          ctx.rect(badgeX, badgeY - badgeHeight, badgeWidth, badgeHeight)
-        }
+        drawRoundedRect(ctx, badgeX, badgeY - badgeHeight, badgeWidth, badgeHeight, 11)
         ctx.fillStyle = 'rgba(15, 23, 42, 0.88)' // Slate-900
         ctx.strokeStyle = ping.color
         ctx.lineWidth = 1.5
