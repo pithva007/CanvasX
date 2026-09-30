@@ -1,22 +1,23 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile.server
+    container_name: drawtogether-backend
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - CLIENT_URL=http://localhost:5173
+      - CLIENT_URL=http://localhost
+      - EMPTY_ROOM_GRACE_PERIOD_MS=60000
     restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.client
+    container_name: drawtogether-frontend
     ports:
       - "80:80"
     depends_on:

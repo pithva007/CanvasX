@@ -1,12 +1,17 @@
-FROM node:18-alpine
+# Dockerfile for DrawTogether Backend
+FROM node:20-alpine
 
 WORKDIR /app
 
+# Install production dependencies
 COPY server/package*.json ./
+RUN npm ci --omit=dev
 
-RUN npm ci --only=production
-
+# Copy application source code
 COPY server/src ./src
+
+ENV NODE_ENV=production
+ENV PORT=3001
 
 EXPOSE 3001
 

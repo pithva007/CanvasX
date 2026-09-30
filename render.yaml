@@ -12,13 +12,15 @@ services:
         value: 3001
       - key: CLIENT_URL
         sync: false
+      - key: EMPTY_ROOM_GRACE_PERIOD_MS
+        value: 60000
     rootDir: server
 
   - type: web
     name: drawtogether-frontend
     runtime: static
     plan: free
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_SOCKET_URL

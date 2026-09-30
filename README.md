@@ -1,498 +1,256 @@
 # DrawTogether - Real-time Collaborative Whiteboard
 
-A production-ready real-time collaborative whiteboard application where multiple users can join the same drawing room using only a password and draw together live on an infinite canvas. Drawing, shapes, text and cursors sync in real time via tldraw's multiplayer store over Socket.IO.
+A production-ready real-time collaborative whiteboard application where teams can create or join drawing rooms using unique room codes and 1-click invite links to draw together live on an infinite canvas. Drawing, shapes, text, and cursors sync seamlessly in real time via **tldraw's multiplayer store** over **Socket.IO**. Includes live attention tools such as **Laser Pointer** and **Radar Ping**.
+
+---
 
 ## 🎨 Features
 
-### Core Features
-- ✨ **Real-time Collaboration** - Live drawing synchronization across all users in a room
-- 🔐 **Password-based Rooms** - Simple room creation and joining with password
-- 🎯 **Infinite Canvas** - Unlimited drawing space with zoom and pan
-- 🎨 **Complete Drawing Tools** - Pencil, eraser, shapes, text, and more
-- 👥 **User Presence** - Live cursor tracking and user connection indicators
-- 📊 **Performance Optimized** - Efficient state management and network communication
+### Core Collaboration
+- ✨ **Real-time Co-Drawing** — Instant bi-directional document sync across all room collaborators via tldraw store diffs.
+- 🔑 **Unique Room Codes & Invite Links** — Spontaneously create rooms with codes (e.g. `ART-4821`) or join via shareable URL (`?room=CODE`).
+- ⏳ **5-Minute Single-User Discard Timer** — Rooms with only 1 participant show a live countdown banner and automatically discard after 5 minutes of inactivity; the timer automatically resets as soon as a teammate joins.
+- 🛡️ **Empty Room Grace Period** — 60-second grace window before deleting an empty room, ensuring browser refreshes (`F5`/`Cmd+R`) and transient network reconnects never destroy active boards.
+- 👥 **Live Collaborator Cursors & Roster** — Real-time cursor coordinates and presence names rendered directly on the infinite canvas.
+- 🔄 **Automatic Reconnection** — Client-side reconnection with state unioning so edits made during offline blips automatically reconcile.
 
-### Drawing Tools
-- **Pencil** - Freehand drawing
-- **Eraser** - Remove content
-- **Highlighter** - Semi-transparent marker
-- **Line/Arrow** - Straight lines and arrows
-- **Shapes** - Rectangle, circle/ellipse
-- **Text Tool** - Add text annotations
-- **Sticky Notes** - Quick note creation
-- **Selection Tool** - Select and move objects
-- **Undo/Redo** - History management
-- **Clear Canvas** - Clear all content
+### Live Attention & Presentation Tools
+- 🔴 **Laser Pointer (Hotkey: `L` or Button)** — Draw glowing vector pointer trails that smoothly fade away after 1.5 seconds. Perfect for guiding attention during meetings without dirtying the permanent canvas.
+- 📡 **Radar Ping (`Alt + Click` or Button)** — Send expanding sonar ripple animations accompanied by an synthesized audio chime and a branded name badge to direct everyone's focus to any coordinate on the board.
 
-### Customization
-- **Color Picker** - Custom stroke and fill colors
-- **Stroke Width** - Adjustable line thickness
-- **Dashed Lines** - Alternative line styles
-- **Fill Colors** - Shape fill customization
-- **Zoom/Pan** - Canvas navigation
-- **Dark/Light Mode** - Theme switching
+### Drawing Capabilities (via tldraw)
+- **Tools**: Freehand Draw, Eraser, Line & Arrow, Rectangle, Ellipse, Triangle, Star, Sticky Notes, Text, Frames, Hand Pan, and Select/Transform.
+- **Styling**: Color palette, stroke width, fill patterns, dashed borders, and text alignment.
+- **Canvas**: Infinite vector canvas, fluid pan & zoom, touch & stylus support.
+- **Export**: Export selection or entire canvas to PNG, SVG, or JSON.
 
-### Export
-- **PNG Export** - Download as image
-- **JSON Export** - Save/restore state
-- **PDF Export** - Document generation (can be added)
-
-### Collaboration
-- **Live Cursors** - See where others are drawing
-- **Presence Indicators** - Know when users connect/disconnect
-- **Automatic Sync** - Real-time updates
-- **Auto-reconnect** - Handle network disconnections
-- **Room State Persistence** - Restore on reconnection
+---
 
 ## 🚀 Tech Stack
 
 ### Frontend
-- **React 18** - UI library
-- **Vite** - Build tool & dev server
-- **tldraw** - Drawing library
-- **Socket.IO Client** - Real-time communication
-- **Tailwind CSS** - Styling
-- **Lucide React** - Icons
+- **React 18** — Component architecture & UI state
+- **Vite 5** — High-speed build tool and development server
+- **tldraw** — Infinite collaborative canvas engine
+- **Socket.IO Client (v4)** — Real-time WebSocket connection
+- **Tailwind CSS** — Modern responsive utility-first design
+- **Lucide React** — Minimalist UI icons
 
 ### Backend
-- **Node.js** - Runtime
-- **Express** - Web framework
-- **Socket.IO** - Real-time events
-- **UUID** - Unique identifiers
-- **CORS** - Cross-origin handling
+- **Node.js (LTS)** — Event-driven runtime
+- **Express** — HTTP server and health check endpoints
+- **Socket.IO (v4)** — WebSocket event handling & room management
+- **UUID & NanoID** — Room & user identifier generation
+- **CORS** — Configurable cross-origin resource sharing
 
-### DevOps
-- **Vercel** - Frontend deployment
-- **Render** - Backend deployment
-- **Docker** - Containerization (optional)
+### DevOps & Infrastructure
+- **Docker & Docker Compose** — Multi-stage production containerization
+- **Nginx** — Reverse proxy & static SPA asset caching
+- **Render / Vercel** — One-click cloud deployment configuration
+
+---
 
 ## 📋 Requirements
 
-- Node.js 18+
-- npm 9+
+- **Node.js**: v18.0.0 or higher (v20+ recommended)
+- **npm**: v9.0.0 or higher
 
-## 🛠️ Installation
+---
 
-### 1. Clone Repository
+## 🛠️ Quick Start
+
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/pithva007/Drawing.git
 cd Drawing
 ```
 
-### 2. Setup Backend
-
+### 2. Install Dependencies
+Using make:
 ```bash
-cd server
-
-# Install dependencies
-npm install
-
-# Create environment file
-cp .env.example .env
-
-# Start development server
-npm run dev
-
-# Or start production server
-npm start
+make install
+```
+Or manually:
+```bash
+cd server && npm install
+cd ../client && npm install
 ```
 
-Backend will run on `http://localhost:3001`
+### 3. Start Development Servers
 
-### 3. Setup Frontend
+Run backend and frontend in separate terminals:
 
-In a new terminal:
-
-```bash
-cd client
-
-# Install dependencies
-npm install
-
-# Create environment file
-cp .env.example .env
-
-# Start development server
-npm run dev
-```
-
-Frontend will run on `http://localhost:5173`
-
-## 📖 Usage
-
-### Local Development
-
-1. **Start Backend**
+**Terminal 1 (Backend - Port 3001):**
 ```bash
 cd server
 npm run dev
 ```
 
-2. **Start Frontend**
+**Terminal 2 (Frontend - Port 5173):**
 ```bash
 cd client
 npm run dev
 ```
 
-3. **Open Browser**
-- Navigate to `http://localhost:5173`
+Open your browser at **`http://localhost:5173`**.
 
-4. **Join Room**
-- Enter any password (e.g., "password123")
-- Click "Join Room"
-- Room is created if it doesn't exist
-- Share password with someone else to collaborate
+---
 
-### Room Rules
-- Configurable capacity per room (default **50**, set via `MAX_USERS_PER_ROOM`)
-- Any password creates or joins a room
-- Room (and its drawing) persists as long as at least one user is connected
-- Empty rooms are cleaned up after 1 hour of inactivity
-- Password is not stored persistently (session only)
+## 📖 How It Works
+
+### Creating or Joining a Room
+1. **Create Room**:
+   - Enter your display name.
+   - Click **Create Room & Start Drawing**.
+   - A unique Room Code (e.g. `ART-4821`) is generated, and the browser address bar syncs to `/?room=ART-4821`.
+   - Click the **Share** or **Room Code** button in the top bar to copy an instant invite link.
+2. **Join Room**:
+   - Paste or enter the room code shared by your teammate.
+   - Enter your display name and click **Join Room**.
+   - When opening an invite link (`/?room=CODE`), the room code is pre-filled automatically.
+
+### Solo Room Auto-Discard & Grace Window
+- **Single-User Discard**: When you are the only user in a room, a banner alerts you that the room will auto-close in 5 minutes unless another collaborator joins.
+- **Grace Period**: If all participants leave or disconnect (e.g. browser reload), the backend preserves the room and its whiteboard state for 60 seconds (`EMPTY_ROOM_GRACE_PERIOD_MS`). Reconnecting within this window restores the drawing intact.
+
+---
 
 ## 🔧 Environment Variables
 
-### Backend (.env)
+### Backend (`server/.env`)
 ```env
 PORT=3001
 NODE_ENV=development
 CLIENT_URL=http://localhost:5173
-# Max users allowed in a single room (default 50)
+
+# Room limits
 MAX_USERS_PER_ROOM=50
+
+# Grace period before empty room deletion (milliseconds)
+EMPTY_ROOM_GRACE_PERIOD_MS=60000
 ```
 
-### Frontend (.env)
+### Frontend (`client/.env`)
 ```env
 VITE_API_URL=http://localhost:3001
 VITE_SOCKET_URL=http://localhost:3001
 ```
 
+---
+
 ## 📦 Project Structure
 
 ```
 Drawing/
-├── client/                    # React frontend
+├── client/                           # React + Vite Frontend
 │   ├── src/
-│   │   ├── components/       # React components
-│   │   │   ├── ErrorBoundary.jsx
-│   │   │   └── Toast.jsx
-│   │   ├── context/          # Context providers
-│   │   │   ├── SocketContext.jsx      # Socket.IO connection
-│   │   │   └── WhiteboardContext.jsx  # Room/user session state
-│   │   ├── hooks/            # Custom hooks
-│   │   │   ├── useSyncStore.js        # tldraw multiplayer store sync
-│   │   │   ├── useSocketEvents.js     # room roster updates
-│   │   │   └── useToast.js
-│   │   ├── pages/            # Page components
-│   │   │   ├── JoinPage.jsx
-│   │   │   └── WhiteboardPage.jsx
-│   │   ├── styles/           # CSS
-│   │   │   └── globals.css
-│   │   ├── App.jsx           # Main app
-│   │   └── main.jsx          # Entry point
-│   ├── public/               # Static files
-│   ├── index.html            # HTML template
+│   │   ├── components/
+│   │   │   ├── ErrorBoundary.jsx     # Graceful error fallback
+│   │   │   ├── LaserAndPingOverlay.jsx # Laser trail & radar ping canvas
+│   │   │   └── Toast.jsx             # Notification toasts
+│   │   ├── context/
+│   │   │   ├── SocketContext.jsx     # Socket.IO connection provider
+│   │   │   └── WhiteboardContext.jsx # Room session & identity provider
+│   │   ├── hooks/
+│   │   │   ├── useSyncStore.js       # tldraw multiplayer store synchronization
+│   │   │   ├── useSocketEvents.js    # Room events & discard handlers
+│   │   │   └── useToast.js           # Toast notification hook
+│   │   ├── pages/
+│   │   │   ├── JoinPage.jsx          # Create / Join room landing page
+│   │   │   └── WhiteboardPage.jsx    # Infinite canvas workspace & controls
+│   │   ├── styles/
+│   │   │   └── globals.css           # Tailwind directives & custom animations
+│   │   ├── App.jsx                   # Page router
+│   │   └── main.jsx                  # Application entry point
+│   ├── index.html                    # HTML template
 │   ├── package.json
 │   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── postcss.config.js
+│   └── tailwind.config.js
 │
-└── server/                   # Express backend
-    ├── src/
-    │   ├── socket/          # Socket.IO handlers
-    │   │   └── handlers.js
-    │   ├── rooms/           # Room management
-    │   │   └── RoomManager.js
-    │   ├── middleware/      # Express middleware
-    │   ├── utils/           # Utility functions
-    │   └── index.js         # Server entry
-    ├── package.json
-    ├── .env                 # Environment config
-    └── .gitignore
+├── server/                           # Express + Socket.IO Backend
+│   ├── src/
+│   │   ├── rooms/
+│   │   │   └── RoomManager.js        # Room lifecycle, snapshot storage & timers
+│   │   ├── socket/
+│   │   │   └── handlers.js           # Real-time WebSocket event dispatchers
+│   │   ├── utils/
+│   │   │   └── constants.js          # Shared socket events & default thresholds
+│   │   └── index.js                  # Express HTTP and WebSocket server entry
+│   ├── package.json
+│   └── .env.example
+│
+├── Dockerfile.client                 # Multi-stage Nginx client container
+├── Dockerfile.server                 # Node 20 backend container
+├── docker-compose.yml                # Multi-service local stack
+├── Makefile                          # Development & operational tasks
+├── nginx.conf                        # SPA routing & security headers config
+└── render.yaml                       # Cloud infrastructure specification
 ```
-
-## 🎯 Key Features Implementation
-
-### Room System
-- Rooms identified by password
-- Auto-generated unique session ID internally
-- Authoritative document snapshot stored server-side (in memory)
-- Inactive rooms cleaned up automatically
-- Configurable room capacity (`MAX_USERS_PER_ROOM`)
-
-### Real-time Sync (tldraw DIY multiplayer)
-The whiteboard uses tldraw's document store synced over Socket.IO:
-
-1. **Seeding handshake** — the first user into an empty room is the *initializer*
-   and seeds the room's document snapshot (`store:init`). Everyone else either
-   receives the current snapshot on join, or (if a seed is in progress) waits for
-   `store:seeded` and pulls the up-to-date snapshot (`store:request-snapshot`).
-   If the initializer disconnects before seeding, another user is promoted.
-2. **Live edits** — local document changes (`store.listen`, `source: 'user'`) are
-   emitted as diffs (`store:update`), folded into the room snapshot so late
-   joiners stay current, and applied on peers via `store.mergeRemoteChanges`
-   (which tags them `remote`, preventing rebroadcast loops).
-3. **Presence** — cursors flow as `presence:update` (throttled, last-write-wins)
-   and are relayed but never persisted; `presence:leave` removes a cursor.
-
-This design converges correctly even when two users open the same fresh room
-simultaneously (verified by an end-to-end two-browser test).
-
-### User Presence
-- Live cursor tracking with names (tldraw collaborator cursors)
-- User join/leave updates the room roster
-- Live user count in the room bar
-
-## ⚠️ Known Limitations
-- **In-memory only** — a room's drawing lives in server memory and is lost when
-  the room empties (matches the no-database design). Add a persistence layer if
-  you need durable boards.
-- **Single-node** — real horizontal scaling across multiple server instances
-  requires the [Socket.IO Redis adapter](https://socket.io/docs/v4/redis-adapter/);
-  a single instance is assumed here. (Render free/starter runs one instance.)
-
-### Reconnection (handled)
-On hosts like Render the WebSocket can drop. Socket.IO reconnects with a **new
-socket id**, which loses the old server-side room membership. The client handles
-this: it retries reconnecting indefinitely, and on the manager's `reconnect`
-event it re-joins the room and **resyncs by union** — merging the room's current
-snapshot in and pushing its own document out — so drawing resumes without wiping
-either side's work. (Edits made while fully offline are pushed on reconnect.)
-
-## 🌐 Deployment
-
-### Backend Deployment (Render)
-
-1. **Connect GitHub Repository**
-   - Sign in to Render
-   - Create new Web Service
-   - Connect Drawing repository
-
-2. **Configure**
-   ```
-   Build Command: npm install
-   Start Command: npm start
-   Environment: Node
-   ```
-
-3. **Set Environment Variables**
-   ```
-   PORT=3001
-   NODE_ENV=production
-   CLIENT_URL=https://yourdomain.com
-   ```
-
-### Frontend Deployment (Vercel)
-
-1. **Connect GitHub Repository**
-   - Sign in to Vercel
-   - Create new project from Drawing/client
-
-2. **Configure**
-   - Root Directory: client
-   - Build Command: npm run build
-   - Output Directory: dist
-
-3. **Set Environment Variables**
-   ```
-   VITE_SOCKET_URL=https://your-backend.onrender.com
-   VITE_API_URL=https://your-backend.onrender.com
-   ```
-
-### Docker Deployment
-
-#### Backend Dockerfile
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY server/package*.json ./
-RUN npm ci --only=production
-COPY server/src ./src
-EXPOSE 3001
-CMD ["npm", "start"]
-```
-
-#### Frontend Dockerfile
-```dockerfile
-FROM node:18-alpine as build
-WORKDIR /app
-COPY client/package*.json ./
-RUN npm ci
-COPY client ./
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-## 🔒 Security
-
-### Implemented
-- ✅ CORS configuration
-- ✅ Input validation
-- ✅ Room access control
-- ✅ User overflow prevention
-- ✅ Socket event validation
-- ✅ XSS protection via React
-
-### Recommendations
-- Use HTTPS in production
-- Implement rate limiting
-- Add user authentication (optional)
-- Sanitize user input
-- Use environment variables for secrets
-
-## 📊 API Endpoints
-
-### Health Check
-```
-GET /health
-```
-Response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "environment": "development",
-  "activeRooms": 5,
-  "activeUsers": 8
-}
-```
-
-### Statistics
-```
-GET /api/stats
-```
-Response:
-```json
-{
-  "rooms": 5,
-  "users": 8,
-  "timestamp": "2024-01-01T00:00:00.000Z"
-}
-```
-
-## 🔌 Socket.IO Events
-
-### Client → Server
-
-#### Room Management
-- `room:join` - Join room with password
-- `room:leave` - Leave current room
-- `room:get-state` - Get current room state
-
-#### Drawing
-- `draw:update` - Send drawing update
-- `draw:clear` - Clear canvas
-
-#### Canvas Control
-- `canvas:zoom` - Update zoom level
-- `canvas:pan` - Update pan offset
-
-#### Interaction
-- `cursor:move` - Update cursor position
-- `file:upload` - Upload image
-
-### Server → Client
-
-#### Room Events
-- `room:user-joined` - User joined room
-- `room:user-left` - User left room
-- `room:full` - Room is full
-
-#### Drawing Events
-- `draw:update` - Drawing update received
-- `draw:clear` - Canvas cleared
-
-#### Canvas Events
-- `canvas:zoom` - Zoom updated
-- `canvas:pan` - Pan updated
-
-#### Interaction Events
-- `cursor:move` - Cursor moved
-- `file:upload` - Image uploaded
-
-## 🚦 Getting Help
-
-### Common Issues
-
-**Connection Failed**
-- Check backend is running on port 3001
-- Verify CORS settings
-- Check firewall rules
-
-**Drawing Not Syncing**
-- Check Socket.IO connection in browser console
-- Verify room password is same for both users
-- Check browser console for errors
-
-**Deployment Issues**
-- Verify environment variables are set
-- Check logs in deployment platform
-- Ensure firewall allows ports 3001, 5173
-
-### Debug Mode
-Enable verbose logging in browser console:
-```javascript
-localStorage.debug = '*'
-```
-
-## 📝 License
-
-MIT License - see LICENSE file for details
-
-## 👨‍💻 Author
-
-Khush Pithva
-
-## 🎓 Learning Resources
-
-- [Socket.IO Documentation](https://socket.io/docs/)
-- [React Documentation](https://react.dev/)
-- [Vite Guide](https://vitejs.dev/guide/)
-- [Tailwind CSS](https://tailwindcss.com/docs/)
-- [tldraw Documentation](https://tldraw.dev/)
-
-## 🐛 Troubleshooting
-
-### Port Already in Use
-```bash
-# macOS/Linux - Find process on port 3001
-lsof -i :3001
-kill -9 <PID>
-
-# Windows
-netstat -ano | findstr :3001
-taskkill /PID <PID> /F
-```
-
-### Clear Cache & Reinstall
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Socket Connection Issues
-1. Check browser console for errors
-2. Verify server is running: `curl http://localhost:3001/health`
-3. Check CORS origin matches
-4. Try hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
-
-## 📞 Support
-
-For support, please open an issue on GitHub or contact the author.
 
 ---
 
-**Made with ❤️ for real-time collaboration**
+## 🔌 Socket.IO Event Reference
+
+### Room Lifecycle
+| Event | Direction | Payload | Description |
+|---|---|---|---|
+| `room:create` | Client → Server | `{ name }` | Generates a new room and returns `{ roomId, roomCode, userId }`. |
+| `room:join` | Client → Server | `{ roomCode, name }` | Joins existing room; returns current document snapshot. |
+| `room:leave` | Client → Server | _none_ | Explicitly departs current room. |
+| `room:user-joined` | Server → Client | `{ user, users }` | Broadcast when a collaborator enters the room. |
+| `room:user-left` | Server → Client | `{ userId, users }` | Broadcast when a collaborator exits or disconnects. |
+| `room:timer-started` | Server → Client | `{ singleUserDiscardAt }` | Signals start of the 5-minute solo discard countdown. |
+| `room:timer-cancelled`| Server → Client | _none_ | Signals that 2+ collaborators are present; cancels discard timer. |
+| `room:discarded` | Server → Client | `{ message }` | Dispatched to remaining user when solo room expires. |
+
+### Document Synchronization (tldraw Store)
+| Event | Direction | Payload | Description |
+|---|---|---|---|
+| `store:init` | Client → Server | `{ roomId, snapshot }` | Initializer seeds the authoritative room document. |
+| `store:seeded` | Server → Client | _none_ | Broadcast to waiting peers that document is seeded. |
+| `store:request-snapshot` | Client → Server | `{ roomId }` | Requests full room document state from server. |
+| `store:update` | Bi-directional | `{ roomId, updates }` | Broadcasts document record diffs (shapes, bindings, assets). |
+
+### Real-Time Presentation & Attention
+| Event | Direction | Payload | Description |
+|---|---|---|---|
+| `presence:update` | Bi-directional | `{ roomId, presence }` | Relays live cursor position and user color (ephemeral). |
+| `presence:leave` | Bi-directional | `{ roomId, userId }` | Cleans up cursor upon user departure. |
+| `laser:points` | Bi-directional | `{ roomId, userId, points, color }` | Relays real-time laser pointer coordinates. |
+| `ping:create` | Bi-directional | `{ roomId, point, color, userName }`| Triggers sonar ripple animation and chime at coordinates. |
+
+---
+
+## 🐳 Docker Deployment
+
+Run the complete multi-container stack locally with Docker Compose:
+
+```bash
+docker compose up --build -d
+```
+
+- **Frontend**: `http://localhost`
+- **Backend**: `http://localhost:3001`
+- **Health Check**: `http://localhost:3001/health`
+
+To stop services:
+```bash
+docker compose down
+```
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Zero-Storage Privacy**: Whiteboards live strictly in transient memory. Room documents are cleared after inactivity, ensuring no sensitive sketches linger on disk.
+- **Security Headers**: Production Nginx configuration enforces `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, and `X-XSS-Protection`.
+- **CORS Protection**: Socket.IO and Express HTTP endpoints validate origin headers against `CLIENT_URL`.
+- **Room Capacity Limits**: Configurable per-room participant ceilings protect system resources against connection flooding.
+
+---
+
+## 📝 License
+
+Distributed under the **MIT License**. See `LICENSE` for more information.
+
+**Built with ❤️ for fluid real-time visual collaboration.**
