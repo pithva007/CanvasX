@@ -11,17 +11,18 @@ export const useWhiteboard = () => {
 }
 
 /**
- * Session-level room state. Drawing state itself lives in the tldraw store
- * (see useSyncStore); this context only tracks room identity, the local user,
- * the roster of collaborators, and the initial sync payload from `room:join`.
+ * Session-level room state. Drawing state lives in the tldraw store (see useSyncStore).
+ * This context tracks room code, user identity, collaborator roster,
+ * initial seeding payload, and the 5-minute single-user discard timer.
  */
 export function WhiteboardProvider({ children }) {
   const [roomId, setRoomId] = useState(null)
-  const [password, setPassword] = useState(null)
+  const [roomCode, setRoomCode] = useState(null)
   const [userId, setUserId] = useState(null)
   const [userName, setUserName] = useState('')
   const [users, setUsers] = useState([])
-  const [seeding, setSeeding] = useState(null) // { needsInit, snapshot } from room:join
+  const [seeding, setSeeding] = useState(null) // { needsInit, snapshot }
+  const [singleUserDiscardAt, setSingleUserDiscardAt] = useState(null)
 
   const addUser = useCallback((user) => {
     setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user])
@@ -33,9 +34,10 @@ export function WhiteboardProvider({ children }) {
 
   const resetRoom = useCallback(() => {
     setRoomId(null)
-    setPassword(null)
+    setRoomCode(null)
     setUsers([])
     setSeeding(null)
+    setSingleUserDiscardAt(null)
   }, [])
 
   return (
@@ -43,8 +45,10 @@ export function WhiteboardProvider({ children }) {
       value={{
         roomId,
         setRoomId,
-        password,
-        setPassword,
+        roomCode,
+        setRoomCode,
+        password: roomCode, // Alias for backward compatibility
+        setPassword: setRoomCode,
         userId,
         setUserId,
         userName,
@@ -55,6 +59,8 @@ export function WhiteboardProvider({ children }) {
         removeUser,
         seeding,
         setSeeding,
+        singleUserDiscardAt,
+        setSingleUserDiscardAt,
         resetRoom,
       }}
     >

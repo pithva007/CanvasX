@@ -10,23 +10,30 @@ export function generateUserId() {
 }
 
 /**
- * Validate room password
+ * Validate room code
+ */
+export function validateRoomCode(roomCode) {
+  if (!roomCode || typeof roomCode !== 'string') {
+    return { valid: false, error: 'Room code is required' }
+  }
+
+  const trimmed = roomCode.trim().toUpperCase()
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Room code cannot be empty' }
+  }
+
+  if (trimmed.length < 3 || trimmed.length > 30) {
+    return { valid: false, error: 'Room code must be between 3 and 30 characters' }
+  }
+
+  return { valid: true, error: null, code: trimmed }
+}
+
+/**
+ * Validate room password (backward compatibility)
  */
 export function validateRoomPassword(password) {
-  if (!password || typeof password !== 'string') {
-    return { valid: false, error: 'Invalid password format' }
-  }
-
-  const trimmed = password.trim()
-  if (trimmed.length === 0) {
-    return { valid: false, error: 'Password cannot be empty' }
-  }
-
-  if (trimmed.length > 50) {
-    return { valid: false, error: 'Password too long' }
-  }
-
-  return { valid: true, error: null }
+  return validateRoomCode(password)
 }
 
 /**

@@ -8,13 +8,20 @@ export const CONSTANTS = {
   ROOM_INACTIVITY_TIMEOUT: 3600000, // 1 hour
   CLEANUP_INTERVAL: 300000, // 5 minutes
 
+  // Single user room discard timeout (5 minutes)
+  SINGLE_USER_TIMEOUT: 5 * 60 * 1000,
+
   // Events
   EVENTS: {
     // Room
+    ROOM_CREATE: 'room:create',
     ROOM_JOIN: 'room:join',
     ROOM_LEAVE: 'room:leave',
     ROOM_USER_JOINED: 'room:user-joined',
     ROOM_USER_LEFT: 'room:user-left',
+    ROOM_TIMER_STARTED: 'room:timer-started',
+    ROOM_TIMER_CANCELLED: 'room:timer-cancelled',
+    ROOM_DISCARDED: 'room:discarded',
 
     // Document sync (tldraw store)
     STORE_INIT: 'store:init',

@@ -1,19 +1,28 @@
-import { validateRoomPassword, sanitizeInput } from '../utils/validators.js'
+import { validateRoomCode, sanitizeInput } from '../utils/validators.js'
 
 /**
  * Setup all Socket.IO event handlers.
  *
  * Collaboration model (tldraw "DIY multiplayer"):
  *  - The room owns the authoritative document snapshot.
- *  - The first user into an empty room is the *initializer*: it seeds the
- *    snapshot via `store:init`. Everyone else either receives the current
- *    snapshot immediately (room already seeded) or waits for `store:seeded`
- *    and then pulls the current snapshot with `store:request-snapshot`.
- *  - Document edits flow as `store:update` diffs, applied to the room snapshot
- *    and relayed to peers. Presence (cursors) flows as `presence:update` and is
- *    relayed but never stored.
+ *  - First user in an empty room seeds the snapshot via `store:init`.
+ *  - Document edits flow as `store:update` diffs.
+ *  - Presence flows as `presence:update` (ephemeral).
+ *
+ * 5-Minute Single-User Rule:
+ *  - When only 1 user is in the room, a 5-minute discard countdown runs.
+ *  - When 2+ users are in the room, the discard timer is cancelled.
+ *  - If 5 minutes pass with only 1 user, the room is discarded and user notified.
  */
 export function setupSocketHandlers(io, roomManager) {
+  // Wire up room discard notification
+  roomManager.setOnRoomDiscard((room, reason) => {
+    io.to(room.sessionId).emit('room:discarded', {
+      message: reason || 'Room discarded because no other collaborators joined within 5 minutes.',
+      roomCode: room.roomCode,
+    })
+  })
+
   io.on('connection', (socket) => {
     console.log(`[Socket] Connected: ${socket.id}`)
 
@@ -34,38 +43,87 @@ export function setupSocketHandlers(io, roomManager) {
       if (next) {
         room.initializerId = next.id
         io.to(next.id).emit('store:please-init')
-        console.log(`[Room ${room.sessionId}] Promoted ${next.id} to initializer`)
+        console.log(`[Room ${room.roomCode}] Promoted ${next.id} to initializer`)
       }
     }
 
     /**
-     * Room: join (create-or-join by password, or join an existing sessionId).
+     * Room: create (starts a brand new room with a unique code).
+     */
+    socket.on('room:create', (data = {}, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      try {
+        const { name } = data
+        const room = roomManager.createRoom()
+
+        const userId = socket.id
+        const displayName = sanitizeInput(name) || `User-${userId.substring(0, 5)}`
+        const user = {
+          id: userId,
+          name: displayName,
+          color: colorForId(userId),
+          connectedAt: new Date(),
+        }
+
+        const result = roomManager.addUserToRoom(room.roomCode, user)
+        if (!result.success) {
+          return respond({ success: false, message: result.message })
+        }
+
+        currentRoom = room
+        currentUserId = userId
+        socket.join(room.sessionId)
+
+        room.initializerId = userId
+        const needsInit = true
+
+        respond({
+          success: true,
+          roomCode: room.roomCode,
+          roomId: room.sessionId,
+          userId,
+          name: displayName,
+          users: usersPayload(room),
+          needsInit,
+          snapshot: null,
+          singleUserDiscardAt: room.singleUserDiscardAt,
+        })
+
+        console.log(
+          `[Room ${room.roomCode}] Created by ${displayName} (session: ${room.sessionId}, 5-min timer active)`
+        )
+      } catch (error) {
+        console.error('[Socket Error] room:create:', error)
+        respond({ success: false, message: 'Failed to create room' })
+      }
+    })
+
+    /**
+     * Room: join (joins an existing room by room code).
      */
     socket.on('room:join', (data = {}, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       try {
-        const { password, roomId, name } = data
-
-        const validation = validateRoomPassword(password)
-        if (!validation.valid && !roomId) {
-          return respond({ success: false, message: validation.error })
-        }
+        const { roomCode, password, roomId, name } = data
+        const rawCode = roomCode || password
 
         let room
         if (roomId) {
           room = roomManager.getRoomBySessionId(roomId)
-          if (!room) return respond({ success: false, message: 'Room not found' })
-          if (room.password !== password) {
-            return respond({ success: false, message: 'Invalid password' })
+        } else if (rawCode) {
+          const validation = validateRoomCode(rawCode)
+          if (!validation.valid) {
+            return respond({ success: false, message: validation.error })
           }
-          if (room.isFull()) {
-            return respond({ success: false, message: 'Room is full' })
-          }
-        } else {
-          const existing = roomManager.getRoomByPassword(password)
-          if (existing && existing.isFull()) {
-            return respond({ success: false, message: 'Room is full' })
-          }
+          room = roomManager.getRoomByCode(validation.code)
+        }
+
+        if (!room) {
+          return respond({ success: false, message: 'Room not found or has expired' })
+        }
+
+        if (room.isFull()) {
+          return respond({ success: false, message: 'Room is full' })
         }
 
         const userId = socket.id
@@ -77,17 +135,16 @@ export function setupSocketHandlers(io, roomManager) {
           connectedAt: new Date(),
         }
 
-        const result = roomManager.addUserToRoom(password, user)
+        const result = roomManager.addUserToRoom(room.roomCode, user)
         if (!result.success) {
           return respond({ success: false, message: result.message })
         }
 
-        room = result.room
         currentRoom = room
         currentUserId = userId
         socket.join(room.sessionId)
 
-        // Decide seeding role.
+        // Decide seeding role
         let needsInit = false
         let snapshot = null
         if (room.isSeeded()) {
@@ -96,9 +153,13 @@ export function setupSocketHandlers(io, roomManager) {
           room.initializerId = userId
           needsInit = true
         }
-        // else: someone is already initializing -> this client waits for `store:seeded`.
 
-        // Notify existing members.
+        // If 2nd user joined, timer is cancelled! Broadcast to everyone in room
+        if (room.users.size > 1) {
+          io.to(room.sessionId).emit('room:timer-cancelled')
+        }
+
+        // Notify existing members
         socket.to(room.sessionId).emit('room:user-joined', {
           user: { id: user.id, name: user.name, color: user.color },
           users: usersPayload(room),
@@ -106,17 +167,18 @@ export function setupSocketHandlers(io, roomManager) {
 
         respond({
           success: true,
+          roomCode: room.roomCode,
           roomId: room.sessionId,
           userId,
           name: displayName,
           users: usersPayload(room),
           needsInit,
           snapshot,
+          singleUserDiscardAt: room.singleUserDiscardAt,
         })
 
         console.log(
-          `[Room ${room.sessionId}] ${displayName} joined ` +
-            `(${room.users.size}/${room.maxUsers}, needsInit=${needsInit})`
+          `[Room ${room.roomCode}] ${displayName} joined (${room.users.size}/${room.maxUsers}, needsInit=${needsInit})`
         )
       } catch (error) {
         console.error('[Socket Error] room:join:', error)
@@ -136,7 +198,7 @@ export function setupSocketHandlers(io, roomManager) {
 
         currentRoom.setSnapshot(data.snapshot)
         socket.to(currentRoom.sessionId).emit('store:seeded')
-        console.log(`[Room ${currentRoom.sessionId}] Seeded by ${currentUserId}`)
+        console.log(`[Room ${currentRoom.roomCode}] Seeded by ${currentUserId}`)
       } catch (error) {
         console.error('[Socket Error] store:init:', error)
       }
@@ -218,10 +280,19 @@ export function setupSocketHandlers(io, roomManager) {
           users: usersPayload(room),
         })
         socket.to(room.sessionId).emit('presence:leave', { userId })
+
+        // If only 1 user left, start the 5-minute discard countdown and notify them!
+        if (result.userCount === 1) {
+          io.to(room.sessionId).emit('room:timer-started', {
+            discardAt: room.singleUserDiscardAt,
+          })
+          console.log(`[Room ${room.roomCode}] Down to 1 user - 5-minute timer started`)
+        }
+
         if (wasInitializer) handleInitializerDeparture(room, userId)
       }
 
-      console.log(`[Room ${room.sessionId}] ${userId} left`)
+      console.log(`[Room ${room.roomCode}] ${userId} left`)
       currentRoom = null
       currentUserId = null
     }

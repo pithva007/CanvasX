@@ -70,7 +70,8 @@ function pushWholeDocument(store, socket) {
  * server-side room membership, so on reconnect we re-join the room and resync
  * (merge the room snapshot in, push our document out) WITHOUT wiping local work.
  */
-export function useSyncStore({ socket, roomId, userId, userName, password, seeding }) {
+export function useSyncStore({ socket, roomId, userId, userName, roomCode, password, seeding }) {
+  const effectiveRoomCode = roomCode || password
   const store = useMemo(
     () => createTLStore({ shapeUtils: defaultShapeUtils, bindingUtils: defaultBindingUtils }),
     []
@@ -206,7 +207,7 @@ export function useSyncStore({ socket, roomId, userId, userName, password, seedi
     // --- Reconnection: rejoin the room (new socket id => lost membership) and
     //     resync by union — never wipe local work. ---
     const onReconnect = () => {
-      socket.emit('room:join', { password, name: userName }, (resp) => {
+      socket.emit('room:join', { roomCode: effectiveRoomCode, name: userName }, (resp) => {
         if (disposed || !resp || !resp.success) return
         if (resp.needsInit) {
           // The room was empty when we came back: reseed it from our document.
@@ -229,7 +230,7 @@ export function useSyncStore({ socket, roomId, userId, userName, password, seedi
       socket.io.off('reconnect', onReconnect)
       cleanups.forEach((fn) => fn())
     }
-  }, [socket, roomId, userId, userName, password, seeding, store])
+  }, [socket, roomId, userId, userName, effectiveRoomCode, seeding, store])
 
   return status
 }

@@ -1,20 +1,28 @@
 import { v4 as uuidv4 } from 'uuid'
 
 const DEFAULT_MAX_USERS = Number(process.env.MAX_USERS_PER_ROOM) || 50
+const SINGLE_USER_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
+const CODE_WORDS = [
+  'ART', 'DRAW', 'SKETCH', 'LINE', 'PEN', 'INK',
+  'GLOW', 'BOLD', 'FLOW', 'MINT', 'PEAK', 'WAVE',
+  'SPARK', 'STAR', 'ZEN', 'CHALK', 'CANVAS', 'VIBE'
+]
 
 /**
  * Room - a single collaborative whiteboard.
  *
  * The room is the authoritative holder of the tldraw *document* snapshot
- * (`{ store, schema }`, document scope only). The first user to enter an empty
- * room seeds this snapshot; every subsequent document diff is applied here so
- * that late joiners always receive the current state. Presence (cursors) is
- * ephemeral and is never stored on the room.
+ * (`{ store, schema }`, document scope only).
+ *
+ * 5-Minute Discard Rule:
+ * Whenever only a single user is in the room (e.g. freshly created or others left),
+ * a 5-minute discard timer runs. If a second user joins, the timer is cleared.
+ * If 5 minutes elapse with only one user, the room is discarded.
  */
 export class Room {
-  constructor(roomId, password, sessionId, maxUsers = DEFAULT_MAX_USERS) {
-    this.roomId = roomId
-    this.password = password
+  constructor(roomCode, sessionId, maxUsers = DEFAULT_MAX_USERS) {
+    this.roomCode = roomCode.toUpperCase()
     this.sessionId = sessionId
     this.users = new Map() // userId -> user
     this.snapshot = null // TLStoreSnapshot { store, schema } | null
@@ -22,6 +30,17 @@ export class Room {
     this.createdAt = new Date()
     this.lastActivity = new Date()
     this.maxUsers = maxUsers
+    this.singleUserTimer = null
+    this.singleUserDiscardAt = null // Timestamp (ms)
+  }
+
+  // Alias for backward compatibility
+  get roomId() {
+    return this.roomCode
+  }
+
+  get password() {
+    return this.roomCode
   }
 
   touch() {
@@ -55,6 +74,10 @@ export class Room {
 
   isEmpty() {
     return this.users.size === 0
+  }
+
+  isAlone() {
+    return this.users.size === 1
   }
 
   isSeeded() {
@@ -96,54 +119,106 @@ export class Room {
     this.touch()
   }
 
+  /**
+   * Start 5-minute single-user discard timer.
+   */
+  startSingleUserTimer(onDiscardCallback) {
+    this.clearSingleUserTimer()
+    this.singleUserDiscardAt = Date.now() + SINGLE_USER_TIMEOUT_MS
+    this.singleUserTimer = setTimeout(() => {
+      this.singleUserTimer = null
+      if (typeof onDiscardCallback === 'function') {
+        onDiscardCallback(this)
+      }
+    }, SINGLE_USER_TIMEOUT_MS)
+
+    if (this.singleUserTimer.unref) this.singleUserTimer.unref()
+    return this.singleUserDiscardAt
+  }
+
+  /**
+   * Clear 5-minute single-user discard timer when 2+ users are present.
+   */
+  clearSingleUserTimer() {
+    if (this.singleUserTimer) {
+      clearTimeout(this.singleUserTimer)
+      this.singleUserTimer = null
+    }
+    this.singleUserDiscardAt = null
+  }
+
   getState() {
     return {
-      roomId: this.roomId,
+      roomCode: this.roomCode,
+      roomId: this.roomCode,
       sessionId: this.sessionId,
       users: this.getUsers(),
       userCount: this.users.size,
       maxUsers: this.maxUsers,
       seeded: this.isSeeded(),
       createdAt: this.createdAt,
+      singleUserDiscardAt: this.singleUserDiscardAt,
     }
   }
 }
 
 /**
- * RoomManager - owns all active rooms and the user -> room mapping.
+ * RoomManager - owns all active rooms, user mapping, and discard timers.
  */
 export class RoomManager {
   constructor(maxUsers) {
-    this.rooms = new Map() // password -> Room
+    this.rooms = new Map() // roomCode (uppercase) -> Room
     this.roomsBySessionId = new Map() // sessionId -> Room
     this.userToRoom = new Map() // userId -> sessionId
-    // Read the env here (constructed after dotenv.config runs in index.js).
     this.maxUsers = maxUsers || Number(process.env.MAX_USERS_PER_ROOM) || DEFAULT_MAX_USERS
-    this.inactivityTimeout = 3600000 // 1 hour
+    this.inactivityTimeout = 3600000 // 1 hour for abandoned rooms
     this.cleanupInterval = 300000 // 5 minutes
+    this.onRoomDiscardCallback = null
     this.startCleanupInterval()
   }
 
-  getOrCreateRoom(password) {
-    if (!password || password.trim() === '') {
-      throw new Error('Password is required')
+  setOnRoomDiscard(callback) {
+    this.onRoomDiscardCallback = callback
+  }
+
+  generateRoomCode() {
+    for (let attempts = 0; attempts < 100; attempts++) {
+      const prefix = CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)]
+      const suffix = Math.floor(1000 + Math.random() * 9000)
+      const code = `${prefix}-${suffix}`
+      if (!this.rooms.has(code)) {
+        return code
+      }
     }
-    if (this.rooms.has(password)) {
-      return this.rooms.get(password)
+    return `ROOM-${uuidv4().substring(0, 6).toUpperCase()}`
+  }
+
+  /**
+   * Create a new room with a unique human-friendly code.
+   */
+  createRoom(customCode) {
+    let code = customCode ? customCode.trim().toUpperCase() : this.generateRoomCode()
+    if (this.rooms.has(code)) {
+      code = this.generateRoomCode()
     }
     const sessionId = uuidv4()
-    const room = new Room(password, password, sessionId, this.maxUsers)
-    this.rooms.set(password, room)
+    const room = new Room(code, sessionId, this.maxUsers)
+    this.rooms.set(code, room)
     this.roomsBySessionId.set(sessionId, room)
     return room
   }
 
-  getRoomBySessionId(sessionId) {
-    return this.roomsBySessionId.get(sessionId)
+  getRoomByCode(roomCode) {
+    if (!roomCode || typeof roomCode !== 'string') return undefined
+    return this.rooms.get(roomCode.trim().toUpperCase())
   }
 
   getRoomByPassword(password) {
-    return this.rooms.get(password)
+    return this.getRoomByCode(password)
+  }
+
+  getRoomBySessionId(sessionId) {
+    return this.roomsBySessionId.get(sessionId)
   }
 
   getRoomForUser(userId) {
@@ -151,8 +226,14 @@ export class RoomManager {
     return sessionId ? this.roomsBySessionId.get(sessionId) : undefined
   }
 
-  addUserToRoom(password, user) {
-    const room = this.getOrCreateRoom(password)
+  /**
+   * Add a user to an existing room.
+   */
+  addUserToRoom(roomCode, user) {
+    const room = this.getRoomByCode(roomCode)
+    if (!room) {
+      return { success: false, message: 'Room not found or has expired', room: null }
+    }
 
     if (room.isFull()) {
       return { success: false, message: 'Room is full', room: null }
@@ -160,9 +241,23 @@ export class RoomManager {
 
     room.addUser(user)
     this.userToRoom.set(user.id, room.sessionId)
+
+    // Single-user 5-minute discard timer check:
+    // If only 1 user, start timer. If 2+ users, clear timer!
+    if (room.users.size === 1) {
+      room.startSingleUserTimer((r) => {
+        this.discardRoom(r.sessionId, 'Room discarded because no other collaborators joined within 5 minutes')
+      })
+    } else if (room.users.size > 1) {
+      room.clearSingleUserTimer()
+    }
+
     return { success: true, room }
   }
 
+  /**
+   * Remove a user from a room.
+   */
   removeUserFromRoom(userId) {
     const sessionId = this.userToRoom.get(userId)
     if (!sessionId) return null
@@ -177,17 +272,41 @@ export class RoomManager {
     this.userToRoom.delete(userId)
 
     if (room.isEmpty()) {
+      room.clearSingleUserTimer()
       this.deleteRoom(room.sessionId)
-      return { room, user, roomDeleted: true }
+      return { room, user, roomDeleted: true, userCount: 0 }
     }
-    return { room, user, roomDeleted: false }
+
+    // If down to only 1 user, start the 5-minute single-user discard timer!
+    if (room.users.size === 1) {
+      room.startSingleUserTimer((r) => {
+        this.discardRoom(r.sessionId, 'Room discarded because no other collaborators joined within 5 minutes')
+      })
+    }
+
+    return { room, user, roomDeleted: false, userCount: room.users.size }
+  }
+
+  discardRoom(sessionId, reason) {
+    const room = this.roomsBySessionId.get(sessionId)
+    if (!room) return false
+
+    console.log(`[Room ${room.roomCode}] Discarded: ${reason}`)
+    if (this.onRoomDiscardCallback) {
+      this.onRoomDiscardCallback(room, reason)
+    }
+
+    this.deleteRoom(sessionId)
+    return true
   }
 
   deleteRoom(sessionId) {
     const room = this.roomsBySessionId.get(sessionId)
     if (!room) return false
+
+    room.clearSingleUserTimer()
     room.getUsers().forEach((u) => this.userToRoom.delete(u.id))
-    this.rooms.delete(room.password)
+    this.rooms.delete(room.roomCode)
     this.roomsBySessionId.delete(sessionId)
     return true
   }
@@ -220,7 +339,6 @@ export class RoomManager {
       }
     }, this.cleanupInterval)
 
-    // Don't keep the event loop alive solely for the cleanup timer.
     if (this.cleanupTimer.unref) this.cleanupTimer.unref()
   }
 }
