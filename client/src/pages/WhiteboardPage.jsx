@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useRoomUsers } from '@/hooks/useSocketEvents'
@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/useToast'
 import { Tldraw } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { Toast } from '@/components/Toast'
+import { LaserAndPingOverlay } from '@/components/LaserAndPingOverlay'
 import {
   LogOut,
   Copy,
@@ -14,7 +15,8 @@ import {
   Users,
   Share2,
   Clock,
-  AlertTriangle,
+  Zap,
+  Radio,
 } from 'lucide-react'
 
 export function WhiteboardPage({ onLeaveRoom }) {
@@ -30,6 +32,10 @@ export function WhiteboardPage({ onLeaveRoom }) {
     resetRoom,
   } = useWhiteboard()
   const { toasts, addToast } = useToast()
+
+  const [editor, setEditor] = useState(null)
+  const [isLaserActive, setIsLaserActive] = useState(false)
+  const overlayRef = useRef(null)
 
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -112,6 +118,24 @@ export function WhiteboardPage({ onLeaveRoom }) {
     }
   }
 
+  const toggleLaser = (explicitState) => {
+    setIsLaserActive((prev) => {
+      const next = typeof explicitState === 'boolean' ? explicitState : !prev
+      if (next) {
+        addToast('Laser Pointer ON — Drag to point (Hotkey: L or Esc to exit)', 'info')
+      }
+      return next
+    })
+  }
+
+  const triggerCenterPing = () => {
+    if (!editor || !overlayRef.current) return
+    const screenCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+    const pageCenter = editor.screenToPage(screenCenter)
+    overlayRef.current.triggerPing(pageCenter)
+    addToast('Radar Ping sent! (Tip: Hold Alt + Click anywhere to ping)', 'info')
+  }
+
   const isSolo = users.length <= 1 || (singleUserDiscardAt && secondsRemaining !== null)
 
   return (
@@ -119,9 +143,21 @@ export function WhiteboardPage({ onLeaveRoom }) {
       {/* tldraw full drawing UI */}
       <Tldraw
         store={storeWithStatus}
-        onMount={(editor) => {
-          if (typeof window !== 'undefined') window.editor = editor
+        onMount={(mountedEditor) => {
+          setEditor(mountedEditor)
+          if (typeof window !== 'undefined') window.editor = mountedEditor
         }}
+      />
+
+      {/* Laser & Radar Ping Interactive Overlay */}
+      <LaserAndPingOverlay
+        ref={overlayRef}
+        editor={editor}
+        socket={socket}
+        userId={userId}
+        userName={userName}
+        isLaserActive={isLaserActive}
+        onToggleLaser={toggleLaser}
       />
 
       {/* 5-Minute Single-User Discard Notice Banner */}
@@ -149,8 +185,34 @@ export function WhiteboardPage({ onLeaveRoom }) {
         </div>
       )}
 
-      {/* Floating Room Bar (Top-Right) */}
-      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2 pointer-events-auto">
+      {/* Floating Header Bar (Top-Right) */}
+      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2 pointer-events-auto flex-wrap justify-end">
+        {/* Laser Pointer Toggle Button */}
+        <button
+          onClick={() => toggleLaser()}
+          title="Laser Pointer (Hotkey: L) — Draw lines that smoothly fade away after 1.5s"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95 ${
+            isLaserActive
+              ? 'bg-rose-600 text-white shadow-rose-600/30 ring-2 ring-rose-400 animate-pulse'
+              : 'bg-slate-900/90 hover:bg-slate-900 text-slate-200'
+          }`}
+        >
+          <Zap className={`w-3.5 h-3.5 ${isLaserActive ? 'text-white' : 'text-rose-400'}`} />
+          <span>Laser</span>
+          <span className="text-[10px] opacity-75 font-mono hidden sm:inline">(L)</span>
+        </button>
+
+        {/* Radar Ping Action Button */}
+        <button
+          onClick={triggerCenterPing}
+          title="Radar Ping (Hold Alt + Click anywhere on canvas) — Sends expanding ripple with your name"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-slate-200 text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md transition-all active:scale-95"
+        >
+          <Radio className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">Ping</span>
+          <span className="text-[10px] text-slate-400 font-mono hidden md:inline">Alt+Click</span>
+        </button>
+
         {/* Room Code Button */}
         <button
           onClick={copyRoomCode}

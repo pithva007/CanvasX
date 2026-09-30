@@ -249,6 +249,43 @@ export function setupSocketHandlers(io, roomManager) {
     })
 
     /**
+     * Laser: relay ephemeral laser stroke points to room peers.
+     */
+    socket.on('laser:points', (data = {}) => {
+      try {
+        if (!currentRoom || !data.points) return
+        socket.to(currentRoom.sessionId).emit('laser:points', {
+          userId: currentUserId,
+          color: data.color || colorForId(currentUserId),
+          strokeId: data.strokeId,
+          points: data.points,
+        })
+      } catch (error) {
+        console.error('[Socket Error] laser:points:', error)
+      }
+    })
+
+    /**
+     * Radar Ping: relay ephemeral attention ping to room peers.
+     */
+    socket.on('ping:create', (data = {}) => {
+      try {
+        if (!currentRoom || data.x == null || data.y == null) return
+        socket.to(currentRoom.sessionId).emit('ping:create', {
+          id: data.id || `ping_${Date.now()}`,
+          x: data.x,
+          y: data.y,
+          userId: currentUserId,
+          userName: data.userName || `User-${currentUserId.substring(0, 5)}`,
+          color: data.color || colorForId(currentUserId),
+          createdAt: Date.now(),
+        })
+      } catch (error) {
+        console.error('[Socket Error] ping:create:', error)
+      }
+    })
+
+    /**
      * Room: leave.
      */
     socket.on('room:leave', () => leaveRoom())

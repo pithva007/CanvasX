@@ -34,6 +34,10 @@ export const CONSTANTS = {
     PRESENCE_UPDATE: 'presence:update',
     PRESENCE_LEAVE: 'presence:leave',
 
+    // Laser & Radar Ping - relayed, never persisted
+    LASER_POINTS: 'laser:points',
+    PING_CREATE: 'ping:create',
+
     // Connection
     CONNECT: 'connect',
     DISCONNECT: 'disconnect',
