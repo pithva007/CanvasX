@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 const DEFAULT_MAX_USERS = Number(process.env.MAX_USERS_PER_ROOM) || 50
 const SINGLE_USER_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+const EMPTY_ROOM_GRACE_PERIOD_MS = Number(process.env.EMPTY_ROOM_GRACE_PERIOD_MS) || 60 * 1000 // 60 seconds
 
 const CODE_WORDS = [
   'ART', 'DRAW', 'SKETCH', 'LINE', 'PEN', 'INK',
@@ -19,6 +20,10 @@ const CODE_WORDS = [
  * Whenever only a single user is in the room (e.g. freshly created or others left),
  * a 5-minute discard timer runs. If a second user joins, the timer is cleared.
  * If 5 minutes elapse with only one user, the room is discarded.
+ *
+ * Empty Room Grace Period:
+ * If a room becomes empty (e.g. page refresh, network blip), a 60-second grace
+ * timer runs before deleting the room so drawings are not instantly wiped.
  */
 export class Room {
   constructor(roomCode, sessionId, maxUsers = DEFAULT_MAX_USERS) {
@@ -32,6 +37,7 @@ export class Room {
     this.maxUsers = maxUsers
     this.singleUserTimer = null
     this.singleUserDiscardAt = null // Timestamp (ms)
+    this.emptyTimer = null // Grace timer before deleting empty room
   }
 
   // Alias for backward compatibility
@@ -147,6 +153,32 @@ export class Room {
     this.singleUserDiscardAt = null
   }
 
+  /**
+   * Start grace period timer before deleting an empty room.
+   */
+  startEmptyTimer(onExpireCallback, durationMs) {
+    this.clearEmptyTimer()
+    const ms = durationMs != null ? durationMs : (Number(process.env.EMPTY_ROOM_GRACE_PERIOD_MS) || 60000)
+    this.emptyTimer = setTimeout(() => {
+      this.emptyTimer = null
+      if (typeof onExpireCallback === 'function') {
+        onExpireCallback(this)
+      }
+    }, ms)
+
+    if (this.emptyTimer.unref) this.emptyTimer.unref()
+  }
+
+  /**
+   * Clear empty room grace timer when a user rejoins.
+   */
+  clearEmptyTimer() {
+    if (this.emptyTimer) {
+      clearTimeout(this.emptyTimer)
+      this.emptyTimer = null
+    }
+  }
+
   getState() {
     return {
       roomCode: this.roomCode,
@@ -166,11 +198,12 @@ export class Room {
  * RoomManager - owns all active rooms, user mapping, and discard timers.
  */
 export class RoomManager {
-  constructor(maxUsers) {
+  constructor(maxUsers, emptyGracePeriodMs) {
     this.rooms = new Map() // roomCode (uppercase) -> Room
     this.roomsBySessionId = new Map() // sessionId -> Room
     this.userToRoom = new Map() // userId -> sessionId
     this.maxUsers = maxUsers || Number(process.env.MAX_USERS_PER_ROOM) || DEFAULT_MAX_USERS
+    this.emptyGracePeriodMs = emptyGracePeriodMs != null ? emptyGracePeriodMs : (Number(process.env.EMPTY_ROOM_GRACE_PERIOD_MS) || 60000)
     this.inactivityTimeout = 3600000 // 1 hour for abandoned rooms
     this.cleanupInterval = 300000 // 5 minutes
     this.onRoomDiscardCallback = null
@@ -239,6 +272,9 @@ export class RoomManager {
       return { success: false, message: 'Room is full', room: null }
     }
 
+    // Cancel empty room grace timer if active (user rejoined before grace period expired!)
+    room.clearEmptyTimer()
+
     room.addUser(user)
     this.userToRoom.set(user.id, room.sessionId)
 
@@ -272,9 +308,18 @@ export class RoomManager {
     this.userToRoom.delete(userId)
 
     if (room.isEmpty()) {
+      // Pause single-user timer while room is empty
       room.clearSingleUserTimer()
-      this.deleteRoom(room.sessionId)
-      return { room, user, roomDeleted: true, userCount: 0 }
+      // Give a 60-second grace period before deleting so quick page refreshes
+      // and temporary network disconnects don't destroy the room and wipe drawings.
+      const graceMs = this.emptyGracePeriodMs
+      room.startEmptyTimer((r) => {
+        if (r.isEmpty()) {
+          console.log(`[Room ${r.roomCode}] Deleted after ${graceMs / 1000}s empty grace period`)
+          this.deleteRoom(r.sessionId)
+        }
+      }, graceMs)
+      return { room, user, roomDeleted: false, userCount: 0 }
     }
 
     // If down to only 1 user, start the 5-minute single-user discard timer!
@@ -305,6 +350,7 @@ export class RoomManager {
     if (!room) return false
 
     room.clearSingleUserTimer()
+    room.clearEmptyTimer()
     room.getUsers().forEach((u) => this.userToRoom.delete(u.id))
     this.rooms.delete(room.roomCode)
     this.roomsBySessionId.delete(sessionId)

@@ -10,6 +10,8 @@ export const CONSTANTS = {
 
   // Single user room discard timeout (5 minutes)
   SINGLE_USER_TIMEOUT: 5 * 60 * 1000,
+  // Grace period before an empty room is deleted (allows page refreshes and network reconnection)
+  EMPTY_ROOM_GRACE_PERIOD: Number(process.env.EMPTY_ROOM_GRACE_PERIOD_MS) || 60000,
 
   // Events
   EVENTS: {
