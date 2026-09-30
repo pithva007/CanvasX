@@ -162,21 +162,21 @@ export function WhiteboardPage({ onLeaveRoom }) {
 
       {/* 5-Minute Single-User Discard Notice Banner */}
       {isSolo && secondsRemaining !== null && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-auto">
-          <div className="flex items-center gap-2 sm:gap-3 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-amber-500/95 text-slate-950 shadow-2xl backdrop-blur-md border border-amber-300 transition-all animate-bounce-subtle">
+        <div className="absolute top-14 lg:top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-auto w-[calc(100vw-1.5rem)] max-w-sm sm:max-w-md lg:w-auto px-1 sm:px-0">
+          <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-3 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-amber-500/95 text-slate-950 shadow-xl backdrop-blur-md border border-amber-300 transition-all animate-bounce-subtle">
             <Clock className="w-4 h-4 text-amber-950 animate-pulse shrink-0" />
-            <div className="text-xs sm:text-sm font-semibold flex items-center gap-1.5 flex-wrap">
-              <span>Solo in room:</span>
+            <div className="text-xs sm:text-sm font-semibold flex items-center gap-1 sm:gap-1.5 flex-wrap">
+              <span>Solo:</span>
               <span className="text-slate-900 font-normal">Closes in</span>
-              <span className="font-mono font-bold text-amber-950 bg-amber-400/80 px-2 py-0.5 rounded-lg">
+              <span className="font-mono font-bold text-amber-950 bg-amber-400/80 px-1.5 sm:px-2 py-0.5 rounded-lg">
                 {formatCountdown(secondsRemaining)}
               </span>
-              <span className="text-slate-900 font-normal hidden sm:inline">unless someone joins</span>
+              <span className="text-slate-900 font-normal hidden md:inline">unless someone joins</span>
             </div>
             <button
               onClick={copyInviteLink}
               title="Copy shareable invite link"
-              className="ml-1 sm:ml-2 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
+              className="ml-auto sm:ml-2 px-2 sm:px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
             >
               <Share2 className="w-3 h-3 text-slate-200" />
               <span>Invite</span>
@@ -186,27 +186,29 @@ export function WhiteboardPage({ onLeaveRoom }) {
       )}
 
       {/* Floating Header Bar (Top-Right) */}
-      <div className="absolute top-3 right-3 z-[500] flex items-center gap-2 pointer-events-auto flex-wrap justify-end">
+      <div className="absolute top-2.5 sm:top-3 right-2 sm:right-3 z-[500] flex items-center gap-1 sm:gap-2 pointer-events-auto max-w-[calc(100vw-1.5rem)] flex-wrap justify-end">
         {/* Laser Pointer Toggle Button */}
         <button
           onClick={() => toggleLaser()}
           title="Laser Pointer (Hotkey: L) — Draw lines that smoothly fade away after 1.5s"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95 ${
+          aria-label="Toggle Laser Pointer"
+          className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0 ${
             isLaserActive
               ? 'bg-rose-600 text-white shadow-rose-600/30 ring-2 ring-rose-400 animate-pulse'
               : 'bg-slate-900/90 hover:bg-slate-900 text-slate-200'
           }`}
         >
           <Zap className={`w-3.5 h-3.5 ${isLaserActive ? 'text-white' : 'text-rose-400'}`} />
-          <span>Laser</span>
-          <span className="text-[10px] opacity-75 font-mono hidden sm:inline">(L)</span>
+          <span className="hidden sm:inline">Laser</span>
+          <span className="text-[10px] opacity-75 font-mono hidden md:inline">(L)</span>
         </button>
 
         {/* Radar Ping Action Button */}
         <button
           onClick={triggerCenterPing}
           title="Radar Ping (Hold Alt + Click anywhere on canvas) — Sends expanding ripple with your name"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-slate-200 text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md transition-all active:scale-95"
+          aria-label="Radar Ping canvas"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-slate-200 text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
         >
           <Radio className="w-3.5 h-3.5 text-cyan-400" />
           <span className="hidden sm:inline">Ping</span>
@@ -217,10 +219,11 @@ export function WhiteboardPage({ onLeaveRoom }) {
         <button
           onClick={copyRoomCode}
           title="Click to copy room code"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md transition-all active:scale-95"
+          aria-label={`Copy room code ${roomCode}`}
+          className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
         >
           <span className="text-slate-400 hidden sm:inline text-xs font-semibold">Room:</span>
-          <span className="font-mono font-bold tracking-wide text-blue-300">{roomCode}</span>
+          <span className="font-mono font-bold tracking-wide text-blue-300 text-xs sm:text-sm">{roomCode}</span>
           {copiedCode ? (
             <Check className="w-3.5 h-3.5 text-emerald-400" />
           ) : (
@@ -232,7 +235,8 @@ export function WhiteboardPage({ onLeaveRoom }) {
         <button
           onClick={copyInviteLink}
           title="Share invite link"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95"
+          aria-label="Share invite link"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
         >
           {copiedLink ? (
             <Check className="w-3.5 h-3.5 text-white" />
@@ -244,7 +248,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
 
         {/* Collaborators counter */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 text-white text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900/90 text-white text-xs sm:text-sm font-medium shadow-lg backdrop-blur-md shrink-0"
           title={users.map((u) => u.name).join(', ') || 'Only you'}
         >
           <Users className="w-3.5 h-3.5 text-slate-300" />
@@ -255,7 +259,8 @@ export function WhiteboardPage({ onLeaveRoom }) {
         <button
           onClick={handleLeave}
           title="Leave room"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95"
+          aria-label="Leave room"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs sm:text-sm font-semibold shadow-lg backdrop-blur-md transition-all active:scale-95 shrink-0"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Leave</span>
