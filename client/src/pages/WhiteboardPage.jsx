@@ -44,6 +44,11 @@ export function WhiteboardPage({ onLeaveRoom }) {
   // Listen to room events: roster updates, timer updates, discard event
   useRoomUsers({
     onDiscard: (message) => {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('drawtogether_in_room')
+        } catch (_) {}
+      }
       addToast(message || 'Room was discarded', 'error')
       resetRoom()
       onLeaveRoom?.()
@@ -61,6 +66,23 @@ export function WhiteboardPage({ onLeaveRoom }) {
     roomCode,
     seeding,
   })
+
+  // Keep browser address bar and session storage in sync with active room (?room=CODE)
+  useEffect(() => {
+    if (!roomCode) return
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('drawtogether_in_room', roomCode)
+        if (window.history.replaceState) {
+          const url = new URL(window.location.href)
+          if (url.searchParams.get('room') !== roomCode) {
+            url.searchParams.set('room', roomCode)
+            window.history.replaceState({}, '', url.toString())
+          }
+        }
+      } catch (_) {}
+    }
+  }, [roomCode])
 
   // Live countdown timer for 5-minute single-user discard
   useEffect(() => {
@@ -89,6 +111,11 @@ export function WhiteboardPage({ onLeaveRoom }) {
 
   const handleLeave = () => {
     if (socket) socket.emit('room:leave')
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('drawtogether_in_room')
+      } catch (_) {}
+    }
     resetRoom()
     onLeaveRoom?.()
   }

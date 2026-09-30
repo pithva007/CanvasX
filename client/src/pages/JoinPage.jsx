@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSocket } from '@/context/SocketContext'
 import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useToast } from '@/hooks/useToast'
@@ -62,6 +62,70 @@ export function JoinPage({ onJoinRoom }) {
     return () => clearTimeout(timer)
   }, [connected])
 
+  const autoReconnectedRef = useRef(false)
+
+  // Auto-reconnect if user refreshed while actively inside this room session
+  useEffect(() => {
+    if (!connected || !socket || autoReconnectedRef.current) return
+    if (typeof window === 'undefined') return
+
+    let inRoomCode = null
+    try {
+      inRoomCode = sessionStorage.getItem('drawtogether_in_room')
+    } catch (_) {}
+
+    if (!inRoomCode || !urlRoomCode || inRoomCode !== urlRoomCode) return
+    const savedName = (localStorage.getItem('drawtogether_name') || '').trim()
+    if (!savedName) return
+
+    autoReconnectedRef.current = true
+    setLoading(true)
+
+    socket.emit('room:join', { roomCode: urlRoomCode, name: savedName }, (response) => {
+      setLoading(false)
+
+      if (response && response.success) {
+        setRoomId(response.roomId)
+        setRoomCode(response.roomCode)
+        setUserId(response.userId)
+        setUserName(response.name)
+        setUsers(response.users || [])
+        setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
+        setSingleUserDiscardAt(response.singleUserDiscardAt)
+
+        try {
+          sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+          if (window.history.replaceState) {
+            const url = new URL(window.location.href)
+            url.searchParams.set('room', response.roomCode)
+            window.history.replaceState({}, '', url.toString())
+          }
+        } catch (_) {}
+
+        addToast(`Reconnected to room ${response.roomCode}!`, 'success')
+        onJoinRoom(response.roomId)
+      } else {
+        try {
+          sessionStorage.removeItem('drawtogether_in_room')
+        } catch (_) {}
+        addToast((response && response.message) || 'Room is no longer available', 'error')
+      }
+    })
+  }, [
+    connected,
+    socket,
+    urlRoomCode,
+    onJoinRoom,
+    addToast,
+    setRoomId,
+    setRoomCode,
+    setUserId,
+    setUserName,
+    setUsers,
+    setSeeding,
+    setSingleUserDiscardAt,
+  ])
+
   const handleCreateRoom = async (e) => {
     e.preventDefault()
 
@@ -86,10 +150,16 @@ export function JoinPage({ onJoinRoom }) {
         setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         setSingleUserDiscardAt(response.singleUserDiscardAt)
 
-        // Clean up URL if there was an old ?room= param
-        if (typeof window !== 'undefined' && window.history.replaceState) {
-          const cleanUrl = window.location.pathname
-          window.history.replaceState({}, '', cleanUrl)
+        // Sync active room to URL address bar and session storage
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+            if (window.history.replaceState) {
+              const url = new URL(window.location.href)
+              url.searchParams.set('room', response.roomCode)
+              window.history.replaceState({}, '', url.toString())
+            }
+          } catch (_) {}
         }
 
         addToast(`Room ${response.roomCode} created!`, 'success')
@@ -129,6 +199,18 @@ export function JoinPage({ onJoinRoom }) {
         setUsers(response.users || [])
         setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         setSingleUserDiscardAt(response.singleUserDiscardAt)
+
+        // Sync active room to URL address bar and session storage
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+            if (window.history.replaceState) {
+              const url = new URL(window.location.href)
+              url.searchParams.set('room', response.roomCode)
+              window.history.replaceState({}, '', url.toString())
+            }
+          } catch (_) {}
+        }
 
         addToast(`Joined room ${response.roomCode}!`, 'success')
         onJoinRoom(response.roomId)
@@ -183,6 +265,17 @@ export function JoinPage({ onJoinRoom }) {
                 onClick={() => {
                   setUrlRoomCode('')
                   setInputRoomCode('')
+                  if (typeof window !== 'undefined') {
+                    try {
+                      sessionStorage.removeItem('drawtogether_in_room')
+                      if (window.history.replaceState) {
+                        const url = new URL(window.location.href)
+                        url.searchParams.delete('room')
+                        const cleanUrl = url.pathname + (url.search ? url.search : '') + url.hash
+                        window.history.replaceState({}, '', cleanUrl)
+                      }
+                    } catch (_) {}
+                  }
                 }}
                 className="text-[11px] text-slate-500 hover:text-slate-800 underline"
               >

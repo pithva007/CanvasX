@@ -38,6 +38,22 @@ export function WhiteboardProvider({ children }) {
     setUsers([])
     setSeeding(null)
     setSingleUserDiscardAt(null)
+
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('drawtogether_in_room')
+        if (window.history.replaceState) {
+          const url = new URL(window.location.href)
+          if (url.searchParams.has('room')) {
+            url.searchParams.delete('room')
+            const cleanUrl = url.pathname + (url.search ? url.search : '') + url.hash
+            window.history.replaceState({}, '', cleanUrl)
+          }
+        }
+      } catch (_) {
+        // Ignore any browser storage/history restrictions
+      }
+    }
   }, [])
 
   return (
