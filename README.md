@@ -1,4 +1,4 @@
-# DrawTogether - Real-time Collaborative Whiteboard
+# CanvasX - Real-time Collaborative Whiteboard
 
 A production-ready real-time collaborative whiteboard application where teams can create or join drawing rooms using unique room codes and 1-click invite links to draw together live on an infinite canvas. Drawing, shapes, text, and cursors sync seamlessly in real time via **tldraw's multiplayer store** over **Socket.IO**. Includes live attention tools such as **Laser Pointer** and **Radar Ping**.
 
