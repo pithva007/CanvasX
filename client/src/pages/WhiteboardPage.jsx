@@ -258,7 +258,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
 
       {/* 5-Minute Single-User Discard Notice Banner */}
       {isSolo && secondsRemaining !== null && (
-        <div className="absolute top-14 lg:top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-auto w-[calc(100vw-1.5rem)] max-w-sm sm:max-w-md lg:w-auto px-1 sm:px-0">
+        <div className="absolute top-20 sm:top-16 left-1/2 -translate-x-1/2 z-[450] pointer-events-auto w-[calc(100vw-1.5rem)] max-w-sm sm:max-w-md lg:w-auto px-1 sm:px-0">
           <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-3 px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-amber-500/95 text-slate-950 shadow-xl backdrop-blur-md border border-amber-300 transition-all animate-bounce-subtle">
             <Clock className="w-4 h-4 text-amber-950 animate-pulse shrink-0" />
             <div className="text-xs sm:text-sm font-semibold flex items-center gap-1 sm:gap-1.5 flex-wrap">
