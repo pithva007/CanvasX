@@ -13,27 +13,41 @@ function Routes() {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname
       const search = window.location.search
-      if (path.startsWith('/admin') || search.includes('admin=true') || search.includes('admin=1')) {
+      const hash = window.location.hash
+      if (
+        path.startsWith('/admin') ||
+        search.includes('admin') ||
+        hash.includes('admin')
+      ) {
         return 'admin'
       }
     }
     return 'join'
   })
 
-  // Handle browser back/forward buttons
+  // Handle browser back/forward and hash changes
   useEffect(() => {
-    const handlePopState = () => {
+    const handleNavigation = () => {
       const path = window.location.pathname
       const search = window.location.search
-      if (path.startsWith('/admin') || search.includes('admin=true') || search.includes('admin=1')) {
+      const hash = window.location.hash
+      if (
+        path.startsWith('/admin') ||
+        search.includes('admin') ||
+        hash.includes('admin')
+      ) {
         setPage('admin')
       } else {
         setPage('join')
       }
     }
 
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
+    window.addEventListener('popstate', handleNavigation)
+    window.addEventListener('hashchange', handleNavigation)
+    return () => {
+      window.removeEventListener('popstate', handleNavigation)
+      window.removeEventListener('hashchange', handleNavigation)
+    }
   }, [])
 
   if (page === 'admin') {
@@ -58,7 +72,7 @@ function Routes() {
       onJoinRoom={() => setPage('whiteboard')}
       onNavigateToAdmin={() => {
         if (window.history.pushState) {
-          window.history.pushState({}, '', '/admin')
+          window.history.pushState({}, '', '?admin=true')
         }
         setPage('admin')
       }}
