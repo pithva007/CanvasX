@@ -39,6 +39,15 @@ export class Room {
     this.singleUserTimer = null
     this.singleUserDiscardAt = null // Timestamp (ms)
     this.emptyTimer = null // Grace timer before deleting empty room
+    this.kickedIds = new Set() // Set of user IDs kicked from the room
+  }
+
+  kickUser(userId) {
+    this.kickedIds.add(userId)
+  }
+
+  isKicked(userId) {
+    return this.kickedIds.has(userId)
   }
 
   // Alias for backward compatibility
@@ -281,6 +290,10 @@ export class RoomManager {
       return { success: false, message: 'Room not found or has expired', room: null }
     }
 
+    if (room.isKicked(user.id)) {
+      return { success: false, message: 'You have been removed from this room by the host', room: null }
+    }
+
     if (room.isFull()) {
       return { success: false, message: 'Room is full', room: null }
     }
@@ -351,6 +364,44 @@ export class RoomManager {
       userCount: room.users.size,
       adminChanged,
       newAdminId: room.adminId,
+    }
+  }
+
+  /**
+   * Kick a user from a room (admin/host only).
+   */
+  kickUserFromRoom(adminUserId, targetUserId) {
+    const sessionId = this.userToRoom.get(adminUserId)
+    if (!sessionId) {
+      return { success: false, message: 'You are not in an active room' }
+    }
+
+    const room = this.roomsBySessionId.get(sessionId)
+    if (!room) {
+      return { success: false, message: 'Room not found or has expired' }
+    }
+
+    if (room.adminId !== adminUserId) {
+      return { success: false, message: 'Only the room host can kick participants' }
+    }
+
+    if (adminUserId === targetUserId) {
+      return { success: false, message: 'You cannot kick yourself' }
+    }
+
+    const targetUser = room.users.get(targetUserId)
+    if (!targetUser) {
+      return { success: false, message: 'User is no longer in this room' }
+    }
+
+    room.kickUser(targetUserId)
+    const removeResult = this.removeUserFromRoom(targetUserId)
+
+    return {
+      success: true,
+      room,
+      targetUser,
+      removeResult,
     }
   }
 

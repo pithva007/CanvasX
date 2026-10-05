@@ -8,7 +8,7 @@ import { useWhiteboard } from '@/context/WhiteboardContext'
  * Timer events update single-user 5-minute countdown.
  * Discard event triggers cleanup and redirection.
  */
-export function useRoomUsers({ onDiscard, onUserJoined, onAdminChanged } = {}) {
+export function useRoomUsers({ onDiscard, onKicked, onUserJoined, onAdminChanged } = {}) {
   const { socket, connected } = useSocket()
   const {
     roomId,
@@ -76,12 +76,22 @@ export function useRoomUsers({ onDiscard, onUserJoined, onAdminChanged } = {}) {
       onDiscard?.(msg)
     }
 
+    const onKickedEvent = (data) => {
+      setSingleUserDiscardAt(null)
+      const msg = data?.message || 'You have been removed from the room by the host.'
+      try {
+        sessionStorage.setItem('canvasx_discard_toast', msg)
+      } catch (_) {}
+      onKicked?.(msg)
+    }
+
     socket.on('room:user-joined', onJoined)
     socket.on('room:user-left', onLeft)
     socket.on('room:admin-changed', onAdminUpdated)
     socket.on('room:timer-started', onTimerStarted)
     socket.on('room:timer-cancelled', onTimerCancelled)
     socket.on('room:discarded', onDiscarded)
+    socket.on('room:kicked', onKickedEvent)
 
     return () => {
       socket.off('room:user-joined', onJoined)
@@ -90,6 +100,7 @@ export function useRoomUsers({ onDiscard, onUserJoined, onAdminChanged } = {}) {
       socket.off('room:timer-started', onTimerStarted)
       socket.off('room:timer-cancelled', onTimerCancelled)
       socket.off('room:discarded', onDiscarded)
+      socket.off('room:kicked', onKickedEvent)
     }
   }, [
     socket,
@@ -101,6 +112,7 @@ export function useRoomUsers({ onDiscard, onUserJoined, onAdminChanged } = {}) {
     setAdminId,
     setSingleUserDiscardAt,
     onDiscard,
+    onKicked,
     onUserJoined,
     onAdminChanged,
   ])

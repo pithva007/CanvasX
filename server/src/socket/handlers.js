@@ -201,7 +201,7 @@ export function setupSocketHandlers(io, roomManager) {
      */
     socket.on('store:init', (data = {}) => {
       try {
-        if (!currentRoom) return
+        if (!currentRoom || socket.data?.kicked) return
         if (currentRoom.isSeeded()) return // first-writer-wins
         if (currentRoom.initializerId && currentRoom.initializerId !== currentUserId) return
         if (!data.snapshot || !data.snapshot.store) return
@@ -220,6 +220,7 @@ export function setupSocketHandlers(io, roomManager) {
     socket.on('store:request-snapshot', (_data, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       try {
+        if (socket.data?.kicked) return respond({ snapshot: null })
         respond({ snapshot: currentRoom ? currentRoom.snapshot : null })
       } catch (error) {
         console.error('[Socket Error] store:request-snapshot:', error)
@@ -232,7 +233,7 @@ export function setupSocketHandlers(io, roomManager) {
      */
     socket.on('store:update', (data = {}) => {
       try {
-        if (!currentRoom || !data.changes) return
+        if (!currentRoom || socket.data?.kicked || !data.changes) return
         currentRoom.applyDiff(data.changes)
         socket.to(currentRoom.sessionId).emit('store:update', {
           changes: data.changes,
@@ -248,7 +249,7 @@ export function setupSocketHandlers(io, roomManager) {
      */
     socket.on('presence:update', (data = {}) => {
       try {
-        if (!currentRoom || !data.presence) return
+        if (!currentRoom || socket.data?.kicked || !data.presence) return
         socket.to(currentRoom.sessionId).emit('presence:update', {
           presence: data.presence,
           userId: currentUserId,
@@ -263,7 +264,7 @@ export function setupSocketHandlers(io, roomManager) {
      */
     socket.on('laser:points', (data = {}) => {
       try {
-        if (!currentRoom || !data.points) return
+        if (!currentRoom || socket.data?.kicked || !data.points) return
         socket.to(currentRoom.sessionId).emit('laser:points', {
           userId: currentUserId,
           color: data.color || colorForId(currentUserId),
@@ -280,7 +281,7 @@ export function setupSocketHandlers(io, roomManager) {
      */
     socket.on('ping:create', (data = {}) => {
       try {
-        if (!currentRoom || data.x == null || data.y == null) return
+        if (!currentRoom || socket.data?.kicked || data.x == null || data.y == null) return
         socket.to(currentRoom.sessionId).emit('ping:create', {
           id: data.id || `ping_${Date.now()}`,
           x: data.x,
@@ -301,7 +302,7 @@ export function setupSocketHandlers(io, roomManager) {
     socket.on('room:discard', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       try {
-        if (!currentRoom) {
+        if (!currentRoom || socket.data?.kicked) {
           return respond({ success: false, message: 'You are not in an active room' })
         }
 
@@ -324,6 +325,72 @@ export function setupSocketHandlers(io, roomManager) {
       } catch (error) {
         console.error('[Socket Error] room:discard:', error)
         respond({ success: false, message: 'Failed to discard room' })
+      }
+    })
+
+    /**
+     * Room: kick (admin/host explicitly removes a specific collaborator from the room).
+     */
+    socket.on('room:kick', (data = {}, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      try {
+        if (!currentRoom || socket.data?.kicked) {
+          return respond({ success: false, message: 'You are not in an active room' })
+        }
+
+        const { targetUserId } = data
+        if (!targetUserId) {
+          return respond({ success: false, message: 'Target user ID is required' })
+        }
+
+        const kickResult = roomManager.kickUserFromRoom(currentUserId, targetUserId)
+        if (!kickResult.success) {
+          return respond({ success: false, message: kickResult.message })
+        }
+
+        const { room, targetUser, removeResult } = kickResult
+        const kickedUserName = targetUser?.name || 'Collaborator'
+        const wasInitializer = room.initializerId === targetUserId
+
+        // 1. Mark target socket data and leave room channel
+        const targetSocket = io.sockets.sockets.get(targetUserId)
+        if (targetSocket) {
+          targetSocket.data = targetSocket.data || {}
+          targetSocket.data.kicked = true
+          targetSocket.leave(room.sessionId)
+        }
+
+        // 2. Direct kick notification to the target user
+        io.to(targetUserId).emit('room:kicked', {
+          message: 'You have been removed from the room by the host.',
+          roomCode: room.roomCode,
+        })
+
+        // 3. Broadcast departure to remaining room members (including the host)
+        if (removeResult && !removeResult.roomDeleted) {
+          io.to(room.sessionId).emit('room:user-left', {
+            userId: targetUserId,
+            users: usersPayload(room),
+            adminId: room.adminId,
+          })
+          io.to(room.sessionId).emit('presence:leave', { userId: targetUserId })
+
+          // If down to 1 user, start 5-minute single-user discard timer and broadcast
+          if (removeResult.userCount === 1) {
+            io.to(room.sessionId).emit('room:timer-started', {
+              discardAt: room.singleUserDiscardAt,
+            })
+            console.log(`[Room ${room.roomCode}] Down to 1 user after kick - 5-minute timer started`)
+          }
+
+          if (wasInitializer) handleInitializerDeparture(room, targetUserId)
+        }
+
+        console.log(`[Room ${room.roomCode}] ${targetUserId} (${kickedUserName}) kicked by host ${currentUserId}`)
+        respond({ success: true, kickedUserName })
+      } catch (error) {
+        console.error('[Socket Error] room:kick:', error)
+        respond({ success: false, message: 'Failed to kick user' })
       }
     })
 
