@@ -4,10 +4,44 @@ import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useRoomUsers } from '@/hooks/useSocketEvents'
 import { useSyncStore } from '@/hooks/useSyncStore'
 import { useToast } from '@/hooks/useToast'
-import { Tldraw } from 'tldraw'
+import {
+  Tldraw,
+  DefaultToolbar,
+  ToolbarItem,
+  SelectToolbarItem,
+  HandToolbarItem,
+  DrawToolbarItem,
+  EraserToolbarItem,
+  ArrowToolbarItem,
+  TextToolbarItem,
+  NoteToolbarItem,
+  AssetToolbarItem,
+  RectangleToolbarItem,
+  EllipseToolbarItem,
+  TriangleToolbarItem,
+  DiamondToolbarItem,
+  HexagonToolbarItem,
+  TrapezoidToolbarItem,
+  RhombusToolbarItem,
+  OvalToolbarItem,
+  StarToolbarItem,
+  CloudToolbarItem,
+  XBoxToolbarItem,
+  CheckBoxToolbarItem,
+  ArrowLeftToolbarItem,
+  ArrowUpToolbarItem,
+  ArrowDownToolbarItem,
+  ArrowRightToolbarItem,
+  LineToolbarItem,
+  HighlightToolbarItem,
+  LaserToolbarItem,
+  FrameToolbarItem,
+} from 'tldraw'
 import 'tldraw/tldraw.css'
 import { Toast } from '@/components/Toast'
 import { LaserAndPingOverlay } from '@/components/LaserAndPingOverlay'
+import { CustomStylePanel } from '@/components/CustomStylePanel'
+import { COLOR_TRANSLATIONS, initializeCustomColors } from '@/utils/customTheme'
 import {
   LogOut,
   Copy,
@@ -24,6 +58,54 @@ import {
   X,
   UserX,
 } from 'lucide-react'
+
+// Enhanced toolbar with all 20 geometric shapes cleanly grouped
+function CustomToolbar(props) {
+  return (
+    <DefaultToolbar {...props}>
+      <SelectToolbarItem />
+      <HandToolbarItem />
+      <DrawToolbarItem />
+      <EraserToolbarItem />
+      <ArrowToolbarItem />
+      <TextToolbarItem />
+      <NoteToolbarItem />
+      <AssetToolbarItem />
+      {/* 20 Geometric shapes grouped together */}
+      <RectangleToolbarItem />
+      <EllipseToolbarItem />
+      <TriangleToolbarItem />
+      <DiamondToolbarItem />
+      <ToolbarItem tool="pentagon" />
+      <HexagonToolbarItem />
+      <ToolbarItem tool="octagon" />
+      <TrapezoidToolbarItem />
+      <RhombusToolbarItem />
+      <ToolbarItem tool="rhombus-2" />
+      <OvalToolbarItem />
+      <StarToolbarItem />
+      <CloudToolbarItem />
+      <ToolbarItem tool="heart" />
+      <XBoxToolbarItem />
+      <CheckBoxToolbarItem />
+      <ArrowLeftToolbarItem />
+      <ArrowUpToolbarItem />
+      <ArrowDownToolbarItem />
+      <ArrowRightToolbarItem />
+      {/* Additional drawing tools */}
+      <LineToolbarItem />
+      <HighlightToolbarItem />
+      <LaserToolbarItem />
+      <FrameToolbarItem />
+    </DefaultToolbar>
+  )
+}
+
+const customComponents = {
+  Toolbar: CustomToolbar,
+  StylePanel: CustomStylePanel,
+}
+
 
 export function WhiteboardPage({ onLeaveRoom }) {
   const { socket } = useSocket()
@@ -55,6 +137,30 @@ export function WhiteboardPage({ onLeaveRoom }) {
   const [userToKick, setUserToKick] = useState(null)
   const [isKicking, setIsKicking] = useState(false)
   const usersDropdownRef = useRef(null)
+  const headerRef = useRef(null)
+
+  // Dynamically update CSS variable --app-header-bottom so tldraw's StylePanel
+  // starts cleanly below the floating header with zero overlap across all screen widths.
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (!headerRef.current) return
+      const rect = headerRef.current.getBoundingClientRect()
+      const bottom = Math.ceil(rect.bottom) + 8
+      document.documentElement.style.setProperty('--app-header-bottom', `${bottom}px`)
+    }
+
+    updateHeaderHeight()
+    const observer = new ResizeObserver(updateHeaderHeight)
+    if (headerRef.current) {
+      observer.observe(headerRef.current)
+    }
+    window.addEventListener('resize', updateHeaderHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateHeaderHeight)
+    }
+  }, [])
 
   // Listen to room events: roster updates, timer updates, discard event, kicked event
   useRoomUsers({
@@ -271,6 +377,12 @@ export function WhiteboardPage({ onLeaveRoom }) {
       {/* tldraw full drawing UI */}
       <Tldraw
         store={storeWithStatus}
+        components={customComponents}
+        overrides={{
+          translations: {
+            en: COLOR_TRANSLATIONS,
+          },
+        }}
         onMount={(mountedEditor) => {
           setEditor(mountedEditor)
           if (typeof window !== 'undefined') window.editor = mountedEditor
@@ -314,7 +426,10 @@ export function WhiteboardPage({ onLeaveRoom }) {
       )}
 
       {/* Floating Header Bar (Top-Right) */}
-      <div className="absolute top-2.5 sm:top-3 right-2 sm:right-3 z-[500] flex items-center gap-1 sm:gap-2 pointer-events-auto max-w-[calc(100vw-1.5rem)] flex-wrap justify-end">
+      <div
+        ref={headerRef}
+        className="absolute top-2.5 sm:top-3 right-2 sm:right-3 z-[500] flex items-center gap-1 sm:gap-2 pointer-events-auto max-w-[calc(100vw-1.5rem)] flex-wrap justify-end"
+      >
         {/* Laser Pointer Toggle Button */}
         <button
           onClick={() => toggleLaser()}
