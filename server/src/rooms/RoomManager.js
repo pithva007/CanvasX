@@ -200,6 +200,56 @@ export class Room {
     }
   }
 
+  getShapeCount() {
+    if (!this.snapshot || !this.snapshot.store) return 0
+    let count = 0
+    for (const [id, rec] of Object.entries(this.snapshot.store)) {
+      if (id.startsWith('shape:') || (rec && rec.typeName === 'shape')) {
+        count++
+      }
+    }
+    return count
+  }
+
+  getDetailedInfo() {
+    const adminUser = this.users.get(this.adminId)
+    return {
+      roomCode: this.roomCode,
+      sessionId: this.sessionId,
+      adminId: this.adminId,
+      adminName: adminUser ? adminUser.name : 'Unknown Host',
+      userCount: this.users.size,
+      maxUsers: this.maxUsers,
+      isFull: this.isFull(),
+      isEmpty: this.isEmpty(),
+      isAlone: this.isAlone(),
+      isSeeded: this.isSeeded(),
+      shapeCount: this.getShapeCount(),
+      createdAt: this.createdAt,
+      lastActivity: this.lastActivity,
+      singleUserDiscardAt: this.singleUserDiscardAt,
+      users: Array.from(this.users.values()).map((u) => ({
+        id: u.id,
+        name: u.name,
+        color: u.color,
+        isAdmin: u.id === this.adminId,
+        connectedAt: u.connectedAt,
+      })),
+    }
+  }
+
+  clearCanvas() {
+    if (!this.snapshot || !this.snapshot.store) return
+    const newStore = {}
+    for (const [id, rec] of Object.entries(this.snapshot.store)) {
+      if (!id.startsWith('shape:') && (!rec || rec.typeName !== 'shape')) {
+        newStore[id] = rec
+      }
+    }
+    this.snapshot.store = newStore
+    this.touch()
+  }
+
   getState() {
     return {
       roomCode: this.roomCode,
@@ -229,11 +279,134 @@ export class RoomManager {
     this.inactivityTimeout = 3600000 // 1 hour for abandoned rooms
     this.cleanupInterval = 300000 // 5 minutes
     this.onRoomDiscardCallback = null
+    this.onActivityLoggedCallback = null
+    this.onRoomsChangedCallback = null
+    this.activityLogs = []
+    this.maxActivityLogs = 250
+    this.totalRoomsCreated = 0
+    this.startedAt = new Date()
     this.startCleanupInterval()
   }
 
   setOnRoomDiscard(callback) {
     this.onRoomDiscardCallback = callback
+  }
+
+  setOnActivityLogged(callback) {
+    this.onActivityLoggedCallback = callback
+  }
+
+  setOnRoomsChanged(callback) {
+    this.onRoomsChangedCallback = callback
+  }
+
+  notifyRoomsChanged() {
+    if (typeof this.onRoomsChangedCallback === 'function') {
+      try {
+        this.onRoomsChangedCallback()
+      } catch (err) {
+        console.error('[RoomManager] Error in onRoomsChangedCallback:', err)
+      }
+    }
+  }
+
+  logActivity({ type, roomCode, userId, userName, details }) {
+    const entry = {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      type, // 'room_create' | 'room_discard' | 'user_join' | 'user_leave' | 'user_kick' | 'draw' | 'laser' | 'ping' | 'broadcast' | 'timer' | 'admin_action'
+      roomCode: roomCode || null,
+      userId: userId || null,
+      userName: userName || null,
+      details: details || '',
+    }
+    this.activityLogs.unshift(entry)
+    if (this.activityLogs.length > this.maxActivityLogs) {
+      this.activityLogs.pop()
+    }
+    if (typeof this.onActivityLoggedCallback === 'function') {
+      try {
+        this.onActivityLoggedCallback(entry)
+      } catch (err) {
+        console.error('[RoomManager] Error in onActivityLoggedCallback:', err)
+      }
+    }
+    return entry
+  }
+
+  getActivityLogs(limit = 100) {
+    return this.activityLogs.slice(0, limit)
+  }
+
+  getDetailedRoomsList() {
+    return Array.from(this.rooms.values()).map((room) => room.getDetailedInfo())
+  }
+
+  getAllUsersList() {
+    const list = []
+    for (const room of this.rooms.values()) {
+      for (const user of room.getUsers()) {
+        list.push({
+          ...user,
+          roomCode: room.roomCode,
+          sessionId: room.sessionId,
+        })
+      }
+    }
+    return list
+  }
+
+  getGlobalStats() {
+    let totalShapes = 0
+    for (const room of this.rooms.values()) {
+      totalShapes += room.getShapeCount()
+    }
+    const mem = process.memoryUsage()
+    return {
+      activeRooms: this.roomsBySessionId.size,
+      activeUsers: this.userToRoom.size,
+      totalShapes,
+      totalRoomsCreated: this.totalRoomsCreated,
+      uptimeSeconds: Math.floor(process.uptime()),
+      memory: {
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+      },
+      startedAt: this.startedAt,
+    }
+  }
+
+  forceDiscardRoom(roomCodeOrSessionId, reason) {
+    const room = this.getRoomByCode(roomCodeOrSessionId) || this.getRoomBySessionId(roomCodeOrSessionId)
+    if (!room) return false
+    return this.discardRoom(room.sessionId, reason || 'Terminated by Super Admin')
+  }
+
+  forceKickUser(targetUserId, reason) {
+    const sessionId = this.userToRoom.get(targetUserId)
+    if (!sessionId) return { success: false, message: 'User not found in any room' }
+    const room = this.roomsBySessionId.get(sessionId)
+    if (!room) return { success: false, message: 'Room not found' }
+
+    const targetUser = room.users.get(targetUserId)
+    room.kickUser(targetUserId)
+    const removeResult = this.removeUserFromRoom(targetUserId)
+    return {
+      success: true,
+      room,
+      targetUser,
+      removeResult,
+      reason: reason || 'Removed by Super Admin',
+    }
+  }
+
+  clearRoomCanvas(roomCodeOrSessionId) {
+    const room = this.getRoomByCode(roomCodeOrSessionId) || this.getRoomBySessionId(roomCodeOrSessionId)
+    if (!room) return false
+    room.clearCanvas()
+    this.notifyRoomsChanged()
+    return true
   }
 
   generateRoomCode() {
@@ -260,6 +433,8 @@ export class RoomManager {
     const room = new Room(code, sessionId, this.maxUsers)
     this.rooms.set(code, room)
     this.roomsBySessionId.set(sessionId, room)
+    this.totalRoomsCreated++
+    this.notifyRoomsChanged()
     return room
   }
 
@@ -303,6 +478,7 @@ export class RoomManager {
 
     room.addUser(user)
     this.userToRoom.set(user.id, room.sessionId)
+    this.notifyRoomsChanged()
 
     // Single-user 5-minute discard timer check:
     // If only 1 user, start timer. If 2+ users, clear timer!
@@ -334,6 +510,7 @@ export class RoomManager {
     const user = room.removeUser(userId)
     this.userToRoom.delete(userId)
     const adminChanged = previousAdminId === userId && room.adminId !== null
+    this.notifyRoomsChanged()
 
     if (room.isEmpty()) {
       // Pause single-user timer while room is empty
@@ -427,6 +604,7 @@ export class RoomManager {
     room.getUsers().forEach((u) => this.userToRoom.delete(u.id))
     this.rooms.delete(room.roomCode)
     this.roomsBySessionId.delete(sessionId)
+    this.notifyRoomsChanged()
     return true
   }
 
