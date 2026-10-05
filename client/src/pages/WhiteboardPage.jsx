@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   Trash2,
   X,
+  UserX,
 } from 'lucide-react'
 
 export function WhiteboardPage({ onLeaveRoom }) {
@@ -51,9 +52,11 @@ export function WhiteboardPage({ onLeaveRoom }) {
   const [isUsersListOpen, setIsUsersListOpen] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
+  const [userToKick, setUserToKick] = useState(null)
+  const [isKicking, setIsKicking] = useState(false)
   const usersDropdownRef = useRef(null)
 
-  // Listen to room events: roster updates, timer updates, discard event
+  // Listen to room events: roster updates, timer updates, discard event, kicked event
   useRoomUsers({
     onDiscard: (message) => {
       if (typeof window !== 'undefined') {
@@ -62,6 +65,21 @@ export function WhiteboardPage({ onLeaveRoom }) {
         } catch (_) {}
       }
       addToast(message || 'Room was discarded', 'info')
+      resetRoom()
+      onLeaveRoom?.()
+    },
+    onKicked: (message) => {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.removeItem('canvasx_in_room')
+          if (window.history.replaceState) {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('room')
+            window.history.replaceState({}, '', url.pathname)
+          }
+        } catch (_) {}
+      }
+      addToast(message || 'You have been removed from the room by the host.', 'error')
       resetRoom()
       onLeaveRoom?.()
     },
@@ -170,6 +188,20 @@ export function WhiteboardPage({ onLeaveRoom }) {
         addToast(response.message || 'Failed to discard room', 'error')
       }
       // On success, room:discarded event will be broadcast to all members (including host)
+    })
+  }
+
+  const handleConfirmKick = (targetUser) => {
+    if (!socket || isKicking || !targetUser) return
+    setIsKicking(true)
+    socket.emit('room:kick', { targetUserId: targetUser.id }, (response) => {
+      setIsKicking(false)
+      setUserToKick(null)
+      if (response?.success) {
+        addToast(`${response.kickedUserName || targetUser.name || 'User'} was removed from the room.`, 'info')
+      } else {
+        addToast(response?.message || 'Failed to remove user from room', 'error')
+      }
     })
   }
 
@@ -430,6 +462,23 @@ export function WhiteboardPage({ onLeaveRoom }) {
                           </span>
                         </div>
                       </div>
+
+                      {/* Host moderation: Kick collaborator */}
+                      {isAdmin && !isMe && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setUserToKick(u)
+                          }}
+                          title={`Kick ${u.name} from room`}
+                          aria-label={`Kick ${u.name} from room`}
+                          className="px-2 py-1 bg-red-500/10 hover:bg-red-500/25 active:scale-95 text-red-300 hover:text-red-200 border border-red-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                        >
+                          <UserX className="w-3.5 h-3.5 text-red-400" />
+                          <span>Kick</span>
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -540,6 +589,55 @@ export function WhiteboardPage({ onLeaveRoom }) {
                   <>
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Yes, Discard Room</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kick Collaborator Confirmation Modal */}
+      {userToKick && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+        >
+          <div className="w-full max-w-sm sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 text-white space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">
+                <UserX className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base sm:text-lg font-bold text-white">Remove Collaborator?</h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Are you sure you want to remove <strong className="text-white font-semibold">{userToKick.name}</strong> from the room? They will be disconnected immediately and prevented from interrupting.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setUserToKick(null)}
+                disabled={isKicking}
+                className="px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmKick(userToKick)}
+                disabled={isKicking}
+                className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isKicking ? (
+                  <span>Removing...</span>
+                ) : (
+                  <>
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>Yes, Remove</span>
                   </>
                 )}
               </button>
