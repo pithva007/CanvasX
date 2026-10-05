@@ -41,6 +41,25 @@ function playSonarBeep() {
 }
 
 /**
+ * Safe Canvas rounded-rect renderer with graceful fallback using arcTo
+ * for older browsers/runtimes that lack native CanvasRenderingContext2D.roundRect
+ */
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, width, height, radius)
+    return
+  }
+
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + width, y, x + width, y + height, r)
+  ctx.arcTo(x + width, y + height, x, y + height, r)
+  ctx.arcTo(x, y + height, x, y, r)
+  ctx.arcTo(x, y, x + width, y, r)
+  ctx.closePath()
+}
+
+/**
  * LaserAndPingOverlay
  *
  * Renders:
@@ -227,10 +246,42 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Reset mouse state if laser is deactivated
+  useEffect(() => {
+    if (!isLaserActive) {
+      isMouseDownRef.current = false
+      currentStrokeIdRef.current = null
+    }
+  }, [isLaserActive])
+
+  // Global window listeners for pointerup, pointercancel, and blur
+  // to guarantee laser strokes cleanly terminate even if the cursor is released outside the window
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      isMouseDownRef.current = false
+      currentStrokeIdRef.current = null
+    }
+
+    window.addEventListener('pointerup', handleGlobalPointerUp)
+    window.addEventListener('pointercancel', handleGlobalPointerUp)
+    window.addEventListener('blur', handleGlobalPointerUp)
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp)
+      window.removeEventListener('pointercancel', handleGlobalPointerUp)
+      window.removeEventListener('blur', handleGlobalPointerUp)
+    }
+  }, [])
+
   // Local Laser Drawing handlers (on overlay canvas when isLaserActive === true)
   const handlePointerDown = (e) => {
     if (!isLaserActive || !editor) return
     if (e.button !== 0) return // Left click only
+
+    // Capture pointer so pointerup is never lost outside the canvas or window
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    } catch (_) {}
 
     isMouseDownRef.current = true
     const strokeId = `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
@@ -250,6 +301,12 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
   const handlePointerMove = (e) => {
     if (!isLaserActive || !isMouseDownRef.current || !editor) return
 
+    // If mouse button was released outside without an event, check e.buttons
+    if (e.buttons !== undefined && (e.buttons & 1) === 0) {
+      handlePointerUp(e)
+      return
+    }
+
     const strokeId = currentStrokeIdRef.current
     const stroke = strokesRef.current.get(strokeId)
     if (!stroke) return
@@ -268,7 +325,14 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
     pendingEmitPointsRef.current.push(point)
   }
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e) => {
+    if (e && e.currentTarget && e.pointerId) {
+      try {
+        if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }
+      } catch (_) {}
+    }
     isMouseDownRef.current = false
     currentStrokeIdRef.current = null
   }
@@ -417,7 +481,7 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
 
         // Badge background
         ctx.beginPath()
-        ctx.roundRect(badgeX, badgeY - badgeHeight, badgeWidth, badgeHeight, 11)
+        drawRoundedRect(ctx, badgeX, badgeY - badgeHeight, badgeWidth, badgeHeight, 11)
         ctx.fillStyle = 'rgba(15, 23, 42, 0.88)' // Slate-900
         ctx.strokeStyle = ping.color
         ctx.lineWidth = 1.5
@@ -447,6 +511,7 @@ export const LaserAndPingOverlay = forwardRef(function LaserAndPingOverlay(
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onPointerLeave={handlePointerUp}
       style={{
         position: 'fixed',
