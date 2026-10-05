@@ -1,4 +1,5 @@
 import { validateRoomCode, sanitizeInput } from '../utils/validators.js'
+import { setupAdminHandlers } from './adminHandlers.js'
 
 /**
  * Setup all Socket.IO event handlers.
@@ -15,8 +16,16 @@ import { validateRoomCode, sanitizeInput } from '../utils/validators.js'
  *  - If 5 minutes pass with only 1 user, the room is discarded and user notified.
  */
 export function setupSocketHandlers(io, roomManager) {
+  // Wire up Super Admin socket handlers and real-time streaming
+  setupAdminHandlers(io, roomManager)
+
   // Wire up room discard notification
   roomManager.setOnRoomDiscard((room, reason) => {
+    roomManager.logActivity({
+      type: 'room_discard',
+      roomCode: room.roomCode,
+      details: reason || 'Room discarded (5-minute single-user timeout)',
+    })
     io.to(room.sessionId).emit('room:discarded', {
       message: reason || 'Room discarded because no other collaborators joined within 5 minutes.',
       roomCode: room.roomCode,
@@ -81,6 +90,14 @@ export function setupSocketHandlers(io, roomManager) {
 
         room.initializerId = userId
         const needsInit = true
+
+        roomManager.logActivity({
+          type: 'room_create',
+          roomCode: room.roomCode,
+          userId,
+          userName: displayName,
+          details: `Room ${room.roomCode} created by ${displayName}`,
+        })
 
         respond({
           success: true,
@@ -173,6 +190,14 @@ export function setupSocketHandlers(io, roomManager) {
           adminId: room.adminId,
         })
 
+        roomManager.logActivity({
+          type: 'user_join',
+          roomCode: room.roomCode,
+          userId,
+          userName: displayName,
+          details: `${displayName} joined room (${room.users.size}/${room.maxUsers})`,
+        })
+
         respond({
           success: true,
           roomCode: room.roomCode,
@@ -239,6 +264,24 @@ export function setupSocketHandlers(io, roomManager) {
           changes: data.changes,
           userId: currentUserId,
         })
+
+        // Throttled activity logging for drawing actions (at most once every 4s per active drawer)
+        const lastDraw = socket.data?.lastDrawLoggedAt || 0
+        const now = Date.now()
+        if (now - lastDraw > 4000) {
+          socket.data = socket.data || {}
+          socket.data.lastDrawLoggedAt = now
+          const shapeCount = currentRoom.getShapeCount()
+          const userName = currentRoom.users.get(currentUserId)?.name || `User-${currentUserId.substring(0, 5)}`
+          roomManager.logActivity({
+            type: 'draw',
+            roomCode: currentRoom.roomCode,
+            userId: currentUserId,
+            userName,
+            details: `Updated canvas (${shapeCount} active shapes)`,
+          })
+          roomManager.notifyRoomsChanged()
+        }
       } catch (error) {
         console.error('[Socket Error] store:update:', error)
       }
@@ -271,6 +314,21 @@ export function setupSocketHandlers(io, roomManager) {
           strokeId: data.strokeId,
           points: data.points,
         })
+
+        const lastLaser = socket.data?.lastLaserLoggedAt || 0
+        const now = Date.now()
+        if (now - lastLaser > 4000) {
+          socket.data = socket.data || {}
+          socket.data.lastLaserLoggedAt = now
+          const userName = currentRoom.users.get(currentUserId)?.name || `User-${currentUserId.substring(0, 5)}`
+          roomManager.logActivity({
+            type: 'laser',
+            roomCode: currentRoom.roomCode,
+            userId: currentUserId,
+            userName,
+            details: 'Active laser pointer trail',
+          })
+        }
       } catch (error) {
         console.error('[Socket Error] laser:points:', error)
       }
@@ -282,14 +340,23 @@ export function setupSocketHandlers(io, roomManager) {
     socket.on('ping:create', (data = {}) => {
       try {
         if (!currentRoom || socket.data?.kicked || data.x == null || data.y == null) return
+        const pingName = data.userName || currentRoom.users.get(currentUserId)?.name || `User-${currentUserId.substring(0, 5)}`
         socket.to(currentRoom.sessionId).emit('ping:create', {
           id: data.id || `ping_${Date.now()}`,
           x: data.x,
           y: data.y,
           userId: currentUserId,
-          userName: data.userName || `User-${currentUserId.substring(0, 5)}`,
+          userName: pingName,
           color: data.color || colorForId(currentUserId),
           createdAt: Date.now(),
+        })
+
+        roomManager.logActivity({
+          type: 'ping',
+          roomCode: currentRoom.roomCode,
+          userId: currentUserId,
+          userName: pingName,
+          details: `Radar attention ping at (${Math.round(data.x)}, ${Math.round(data.y)})`,
         })
       } catch (error) {
         console.error('[Socket Error] ping:create:', error)
@@ -312,7 +379,16 @@ export function setupSocketHandlers(io, roomManager) {
 
         const roomCode = currentRoom.roomCode
         const sessionId = currentRoom.sessionId
+        const adminName = currentRoom.users.get(currentUserId)?.name || currentUserId
         console.log(`[Room ${roomCode}] Discard requested by admin ${currentUserId}`)
+
+        roomManager.logActivity({
+          type: 'room_discard',
+          roomCode,
+          userId: currentUserId,
+          userName: adminName,
+          details: `Room discarded by host ${adminName}`,
+        })
 
         const discarded = roomManager.discardRoom(sessionId, 'Room was discarded by the room admin.')
         if (!discarded) {
@@ -386,6 +462,14 @@ export function setupSocketHandlers(io, roomManager) {
           if (wasInitializer) handleInitializerDeparture(room, targetUserId)
         }
 
+        roomManager.logActivity({
+          type: 'user_kick',
+          roomCode: room.roomCode,
+          userId: targetUserId,
+          userName: kickedUserName,
+          details: `Host kicked user ${kickedUserName}`,
+        })
+
         console.log(`[Room ${room.roomCode}] ${targetUserId} (${kickedUserName}) kicked by host ${currentUserId}`)
         respond({ success: true, kickedUserName })
       } catch (error) {
@@ -415,10 +499,20 @@ export function setupSocketHandlers(io, roomManager) {
       if (!currentRoom || !currentUserId) return
       const room = currentRoom
       const userId = currentUserId
+      const departingUser = room.users.get(userId)
+      const departingName = departingUser?.name || `User-${userId.substring(0, 5)}`
       const wasInitializer = room.initializerId === userId
 
       const result = roomManager.removeUserFromRoom(userId)
       socket.leave(room.sessionId)
+
+      roomManager.logActivity({
+        type: 'user_leave',
+        roomCode: room.roomCode,
+        userId,
+        userName: departingName,
+        details: `${departingName} left room (${room.users.size} remaining)`,
+      })
 
       if (result && !result.roomDeleted) {
         socket.to(room.sessionId).emit('room:user-left', {
