@@ -14,9 +14,10 @@ import {
   Users,
   Clock,
   ArrowRight,
+  Shield,
 } from 'lucide-react'
 
-export function JoinPage({ onJoinRoom }) {
+export function JoinPage({ onJoinRoom, onNavigateToAdmin }) {
   const [name, setName] = useState(
     () => localStorage.getItem('canvasx_name') || ''
   )
@@ -504,6 +505,20 @@ export function JoinPage({ onJoinRoom }) {
         <p className="text-center text-slate-400 text-xs mt-6 font-medium">
           Create a room and share the code or link with your collaborators to draw together.
         </p>
+
+        <div className="flex items-center justify-center gap-2 mt-4 text-[11px] text-slate-400">
+          <span>Protected collaboration</span>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onNavigateToAdmin}
+            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition-colors font-mono"
+            title="Super Admin Console"
+          >
+            <Shield className="w-3.5 h-3.5 text-indigo-400/80" />
+            <span>Admin Console</span>
+          </button>
+        </div>
       </div>
     </div>
   )
