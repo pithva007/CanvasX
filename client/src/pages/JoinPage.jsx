@@ -40,6 +40,7 @@ export function JoinPage({ onJoinRoom }) {
     setUserId,
     setUserName,
     setUsers,
+    setAdminId,
     setSeeding,
     setSingleUserDiscardAt,
   } = useWhiteboard()
@@ -48,6 +49,17 @@ export function JoinPage({ onJoinRoom }) {
   const [showSettingsHint, setShowSettingsHint] = useState(false)
   const [showServerSettings, setShowServerSettings] = useState(false)
   const [tempServerUrl, setTempServerUrl] = useState(serverUrl)
+
+  // Show discard toast if room was discarded by admin or timeout
+  useEffect(() => {
+    try {
+      const discardMsg = sessionStorage.getItem('drawtogether_discard_toast')
+      if (discardMsg) {
+        sessionStorage.removeItem('drawtogether_discard_toast')
+        addToast(discardMsg, 'info')
+      }
+    } catch (_) {}
+  }, [addToast])
 
   useEffect(() => {
     let timer
@@ -90,6 +102,7 @@ export function JoinPage({ onJoinRoom }) {
         setUserId(response.userId)
         setUserName(response.name)
         setUsers(response.users || [])
+        setAdminId(response.adminId || null)
         setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         setSingleUserDiscardAt(response.singleUserDiscardAt)
 
@@ -122,6 +135,7 @@ export function JoinPage({ onJoinRoom }) {
     setUserId,
     setUserName,
     setUsers,
+    setAdminId,
     setSeeding,
     setSingleUserDiscardAt,
   ])
@@ -147,6 +161,7 @@ export function JoinPage({ onJoinRoom }) {
         setUserId(response.userId)
         setUserName(response.name)
         setUsers(response.users || [])
+        setAdminId(response.adminId || response.userId)
         setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         setSingleUserDiscardAt(response.singleUserDiscardAt)
 
@@ -197,6 +212,7 @@ export function JoinPage({ onJoinRoom }) {
         setUserId(response.userId)
         setUserName(response.name)
         setUsers(response.users || [])
+        setAdminId(response.adminId || null)
         setSeeding({ needsInit: response.needsInit, snapshot: response.snapshot })
         setSingleUserDiscardAt(response.singleUserDiscardAt)
 
