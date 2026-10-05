@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server
-    container_name: drawtogether-backend
+    container_name: canvasx-backend
     ports:
       - "3001:3001"
     environment:
@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.client
-    container_name: drawtogether-frontend
+    container_name: canvasx-frontend
     ports:
       - "80:80"
     depends_on:

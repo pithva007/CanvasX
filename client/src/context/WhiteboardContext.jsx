@@ -48,7 +48,7 @@ export function WhiteboardProvider({ children }) {
 
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.removeItem('drawtogether_in_room')
+        sessionStorage.removeItem('canvasx_in_room')
         if (window.history.replaceState) {
           const url = new URL(window.location.href)
           if (url.searchParams.has('room')) {

@@ -86,7 +86,7 @@ app.use((req, res) => {
 server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗
-║  DrawTogether - Whiteboard Server      ║
+║  CanvasX - Whiteboard Server           ║
 ║  Version: 1.0.0                        ║
 ║  Environment: ${NODE_ENV.padEnd(29)}║
 ║  Server running on port ${PORT}               ║

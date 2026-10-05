@@ -23,7 +23,7 @@ const cleanUrl = (url) => {
 export function SocketProvider({ children }) {
   const [serverUrl, setServerUrl] = useState(() => {
     const rawUrl =
-      localStorage.getItem('drawtogether_server_url') ||
+      localStorage.getItem('canvasx_server_url') ||
       import.meta.env.VITE_SOCKET_URL ||
       'http://localhost:3001'
     return cleanUrl(rawUrl)
@@ -68,7 +68,7 @@ export function SocketProvider({ children }) {
     const cleaned = cleanUrl(formattedUrl)
 
     if (cleaned) {
-      localStorage.setItem('drawtogether_server_url', cleaned)
+      localStorage.setItem('canvasx_server_url', cleaned)
       setServerUrl(cleaned)
       setConnected(false)
     }
