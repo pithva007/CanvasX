@@ -29,6 +29,7 @@ export class Room {
   constructor(roomCode, sessionId, maxUsers = DEFAULT_MAX_USERS) {
     this.roomCode = roomCode.toUpperCase()
     this.sessionId = sessionId
+    this.adminId = null // socketId of the room admin
     this.users = new Map() // userId -> user
     this.snapshot = null // TLStoreSnapshot { store, schema } | null
     this.initializerId = null // socketId currently seeding the snapshot
@@ -56,6 +57,10 @@ export class Room {
   addUser(user) {
     if (this.users.size >= this.maxUsers) return null
     this.users.set(user.id, user)
+    // First user or reconnecting user in an admin-less room becomes admin
+    if (!this.adminId) {
+      this.adminId = user.id
+    }
     this.touch()
     return user
   }
@@ -65,13 +70,20 @@ export class Room {
     if (user) {
       this.users.delete(userId)
       if (this.initializerId === userId) this.initializerId = null
+      if (this.adminId === userId) {
+        const remaining = Array.from(this.users.keys())
+        this.adminId = remaining.length > 0 ? remaining[0] : null
+      }
       this.touch()
     }
     return user
   }
 
   getUsers() {
-    return Array.from(this.users.values())
+    return Array.from(this.users.values()).map((u) => ({
+      ...u,
+      isAdmin: u.id === this.adminId,
+    }))
   }
 
   isFull() {
@@ -184,6 +196,7 @@ export class Room {
       roomCode: this.roomCode,
       roomId: this.roomCode,
       sessionId: this.sessionId,
+      adminId: this.adminId,
       users: this.getUsers(),
       userCount: this.users.size,
       maxUsers: this.maxUsers,
@@ -304,8 +317,10 @@ export class RoomManager {
       return null
     }
 
+    const previousAdminId = room.adminId
     const user = room.removeUser(userId)
     this.userToRoom.delete(userId)
+    const adminChanged = previousAdminId === userId && room.adminId !== null
 
     if (room.isEmpty()) {
       // Pause single-user timer while room is empty
@@ -319,7 +334,7 @@ export class RoomManager {
           this.deleteRoom(r.sessionId)
         }
       }, graceMs)
-      return { room, user, roomDeleted: false, userCount: 0 }
+      return { room, user, roomDeleted: false, userCount: 0, adminChanged: false, newAdminId: null }
     }
 
     // If down to only 1 user, start the 5-minute single-user discard timer!
@@ -329,7 +344,14 @@ export class RoomManager {
       })
     }
 
-    return { room, user, roomDeleted: false, userCount: room.users.size }
+    return {
+      room,
+      user,
+      roomDeleted: false,
+      userCount: room.users.size,
+      adminChanged,
+      newAdminId: room.adminId,
+    }
   }
 
   discardRoom(sessionId, reason) {

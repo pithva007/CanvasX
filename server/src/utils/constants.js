@@ -19,6 +19,8 @@ export const CONSTANTS = {
     ROOM_CREATE: 'room:create',
     ROOM_JOIN: 'room:join',
     ROOM_LEAVE: 'room:leave',
+    ROOM_DISCARD: 'room:discard',
+    ROOM_ADMIN_CHANGED: 'room:admin-changed',
     ROOM_USER_JOINED: 'room:user-joined',
     ROOM_USER_LEFT: 'room:user-left',
     ROOM_TIMER_STARTED: 'room:timer-started',

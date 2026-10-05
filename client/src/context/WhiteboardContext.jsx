@@ -21,8 +21,14 @@ export function WhiteboardProvider({ children }) {
   const [userId, setUserId] = useState(null)
   const [userName, setUserName] = useState('')
   const [users, setUsers] = useState([])
+  const [adminId, setAdminId] = useState(null)
   const [seeding, setSeeding] = useState(null) // { needsInit, snapshot }
   const [singleUserDiscardAt, setSingleUserDiscardAt] = useState(null)
+
+  const isAdmin = Boolean(
+    (userId && adminId && userId === adminId) ||
+    (userId && users.some((u) => u.id === userId && u.isAdmin))
+  )
 
   const addUser = useCallback((user) => {
     setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user])
@@ -36,6 +42,7 @@ export function WhiteboardProvider({ children }) {
     setRoomId(null)
     setRoomCode(null)
     setUsers([])
+    setAdminId(null)
     setSeeding(null)
     setSingleUserDiscardAt(null)
 
@@ -71,6 +78,9 @@ export function WhiteboardProvider({ children }) {
         setUserName,
         users,
         setUsers,
+        adminId,
+        setAdminId,
+        isAdmin,
         addUser,
         removeUser,
         seeding,

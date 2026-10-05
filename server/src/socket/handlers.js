@@ -30,7 +30,12 @@ export function setupSocketHandlers(io, roomManager) {
     let currentUserId = null // === socket.id
 
     const usersPayload = (room) =>
-      room.getUsers().map((u) => ({ id: u.id, name: u.name, color: u.color }))
+      room.getUsers().map((u) => ({
+        id: u.id,
+        name: u.name,
+        color: u.color,
+        isAdmin: u.id === room.adminId,
+      }))
 
     /**
      * Promote a new initializer if the current one leaves before seeding.
@@ -84,6 +89,8 @@ export function setupSocketHandlers(io, roomManager) {
           userId,
           name: displayName,
           users: usersPayload(room),
+          adminId: room.adminId,
+          isAdmin: true,
           needsInit,
           snapshot: null,
           singleUserDiscardAt: room.singleUserDiscardAt,
@@ -161,8 +168,9 @@ export function setupSocketHandlers(io, roomManager) {
 
         // Notify existing members
         socket.to(room.sessionId).emit('room:user-joined', {
-          user: { id: user.id, name: user.name, color: user.color },
+          user: { id: user.id, name: user.name, color: user.color, isAdmin: user.id === room.adminId },
           users: usersPayload(room),
+          adminId: room.adminId,
         })
 
         respond({
@@ -172,6 +180,8 @@ export function setupSocketHandlers(io, roomManager) {
           userId,
           name: displayName,
           users: usersPayload(room),
+          adminId: room.adminId,
+          isAdmin: userId === room.adminId,
           needsInit,
           snapshot,
           singleUserDiscardAt: room.singleUserDiscardAt,
@@ -286,6 +296,38 @@ export function setupSocketHandlers(io, roomManager) {
     })
 
     /**
+     * Room: discard (admin explicitly discards the room at any time).
+     */
+    socket.on('room:discard', (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      try {
+        if (!currentRoom) {
+          return respond({ success: false, message: 'You are not in an active room' })
+        }
+
+        if (currentRoom.adminId !== currentUserId) {
+          return respond({ success: false, message: 'Only the room admin can discard this room' })
+        }
+
+        const roomCode = currentRoom.roomCode
+        const sessionId = currentRoom.sessionId
+        console.log(`[Room ${roomCode}] Discard requested by admin ${currentUserId}`)
+
+        const discarded = roomManager.discardRoom(sessionId, 'Room was discarded by the room admin.')
+        if (!discarded) {
+          return respond({ success: false, message: 'Failed to discard room' })
+        }
+
+        currentRoom = null
+        currentUserId = null
+        respond({ success: true })
+      } catch (error) {
+        console.error('[Socket Error] room:discard:', error)
+        respond({ success: false, message: 'Failed to discard room' })
+      }
+    })
+
+    /**
      * Room: leave.
      */
     socket.on('room:leave', () => leaveRoom())
@@ -315,8 +357,17 @@ export function setupSocketHandlers(io, roomManager) {
         socket.to(room.sessionId).emit('room:user-left', {
           userId,
           users: usersPayload(room),
+          adminId: room.adminId,
         })
         socket.to(room.sessionId).emit('presence:leave', { userId })
+
+        if (result.adminChanged) {
+          io.to(room.sessionId).emit('room:admin-changed', {
+            adminId: room.adminId,
+            users: usersPayload(room),
+          })
+          console.log(`[Room ${room.roomCode}] Admin transferred to ${room.adminId}`)
+        }
 
         // If only 1 user left, start the 5-minute discard countdown and notify them!
         if (result.userCount === 1) {
