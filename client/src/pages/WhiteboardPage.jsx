@@ -4,7 +4,12 @@ import { useWhiteboard } from '@/context/WhiteboardContext'
 import { useRoomUsers } from '@/hooks/useSocketEvents'
 import { useSyncStore } from '@/hooks/useSyncStore'
 import { useToast } from '@/hooks/useToast'
-import { Tldraw } from 'tldraw'
+import {
+  Tldraw,
+  DefaultToolbar,
+  DefaultToolbarContent,
+  ToolbarItem,
+} from 'tldraw'
 import 'tldraw/tldraw.css'
 import { Toast } from '@/components/Toast'
 import { LaserAndPingOverlay } from '@/components/LaserAndPingOverlay'
@@ -24,6 +29,23 @@ import {
   X,
   UserX,
 } from 'lucide-react'
+
+// Enhanced toolbar ensuring all 20 geometric shapes are available in toolbar and overflow menu
+function CustomToolbar(props) {
+  return (
+    <DefaultToolbar {...props}>
+      <DefaultToolbarContent />
+      <ToolbarItem tool="trapezoid" />
+      <ToolbarItem tool="pentagon" />
+      <ToolbarItem tool="octagon" />
+      <ToolbarItem tool="rhombus-2" />
+    </DefaultToolbar>
+  )
+}
+
+const customComponents = {
+  Toolbar: CustomToolbar,
+}
 
 export function WhiteboardPage({ onLeaveRoom }) {
   const { socket } = useSocket()
@@ -271,6 +293,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
       {/* tldraw full drawing UI */}
       <Tldraw
         store={storeWithStatus}
+        components={customComponents}
         onMount={(mountedEditor) => {
           setEditor(mountedEditor)
           if (typeof window !== 'undefined') window.editor = mountedEditor

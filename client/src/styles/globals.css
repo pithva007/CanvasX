@@ -103,3 +103,22 @@ select:focus {
     @apply animate-spin;
   }
 }
+
+/* =========================================================================
+   tldraw UI Enhancements: Style Panel Positioning & Color Swatches
+   ========================================================================= */
+
+/* Ensure desktop StylePanel box starts cleanly below the top floating header bar */
+.tlui-style-panel__wrapper,
+.tlui-style-panel__wrapper:only-child {
+  margin-top: 58px !important;
+  max-height: calc(100vh - 130px) !important;
+  transition: margin-top 0.15s ease-out;
+}
+
+/* Ensure clean border on light/white color button in color picker */
+[data-testid="style.color.white"] {
+  border: 1px solid rgba(0, 0, 0, 0.25) !important;
+  border-radius: 9999px;
+}
+
