@@ -111,14 +111,45 @@ select:focus {
 /* Ensure desktop StylePanel box starts cleanly below the top floating header bar */
 .tlui-style-panel__wrapper,
 .tlui-style-panel__wrapper:only-child {
-  margin-top: 58px !important;
-  max-height: calc(100vh - 130px) !important;
+  margin-top: var(--app-header-bottom, 58px) !important;
+  max-height: calc(100vh - var(--app-header-bottom, 58px) - 24px) !important;
   transition: margin-top 0.15s ease-out;
+  z-index: 400 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Ensure clean border on light/white color button in color picker */
+/* Custom sleek scrollbar for StylePanel when containing many colors */
+.tlui-style-panel__wrapper::-webkit-scrollbar,
+.tlui-style-panel::-webkit-scrollbar {
+  width: 5px;
+  display: block;
+}
+
+.tlui-style-panel__wrapper::-webkit-scrollbar-track,
+.tlui-style-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tlui-style-panel__wrapper::-webkit-scrollbar-thumb,
+.tlui-style-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 9999px;
+}
+
+.tlui-style-panel__wrapper::-webkit-scrollbar-thumb:hover,
+.tlui-style-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* Ensure clean border on light/white and pastel color buttons in color picker */
 [data-testid="style.color.white"] {
-  border: 1px solid rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(0, 0, 0, 0.22) !important;
+  border-radius: 9999px;
+}
+
+[data-testid="style.color.mint"],
+[data-testid="style.color.yellow"],
+[data-testid="style.color.rose"] {
   border-radius: 9999px;
 }
 
