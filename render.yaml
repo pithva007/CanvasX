@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: drawtogether-backend
+    name: canvasx-backend
     runtime: node
     plan: free
     buildCommand: npm install
@@ -17,14 +17,14 @@ services:
     rootDir: server
 
   - type: web
-    name: drawtogether-frontend
+    name: canvasx-frontend
     runtime: static
     plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_SOCKET_URL
-        value: https://drawtogether-backend.onrender.com
+        value: https://canvasx-backend.onrender.com
       - key: VITE_API_URL
-        value: https://drawtogether-backend.onrender.com
+        value: https://canvasx-backend.onrender.com
     rootDir: client

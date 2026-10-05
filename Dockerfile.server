@@ -1,4 +1,4 @@
-# Dockerfile for DrawTogether Backend
+# Dockerfile for CanvasX Backend
 FROM node:20-alpine
 
 WORKDIR /app

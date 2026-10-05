@@ -17,7 +17,9 @@ import {
 } from 'lucide-react'
 
 export function JoinPage({ onJoinRoom }) {
-  const [name, setName] = useState(() => localStorage.getItem('drawtogether_name') || '')
+  const [name, setName] = useState(
+    () => localStorage.getItem('canvasx_name') || ''
+  )
 
   // Read ?room=... from URL if provided (invite link)
   const [urlRoomCode, setUrlRoomCode] = useState(() => {
@@ -53,9 +55,9 @@ export function JoinPage({ onJoinRoom }) {
   // Show discard toast if room was discarded by admin or timeout
   useEffect(() => {
     try {
-      const discardMsg = sessionStorage.getItem('drawtogether_discard_toast')
+      const discardMsg = sessionStorage.getItem('canvasx_discard_toast')
       if (discardMsg) {
-        sessionStorage.removeItem('drawtogether_discard_toast')
+        sessionStorage.removeItem('canvasx_discard_toast')
         addToast(discardMsg, 'info')
       }
     } catch (_) {}
@@ -83,11 +85,11 @@ export function JoinPage({ onJoinRoom }) {
 
     let inRoomCode = null
     try {
-      inRoomCode = sessionStorage.getItem('drawtogether_in_room')
+      inRoomCode = sessionStorage.getItem('canvasx_in_room')
     } catch (_) {}
 
     if (!inRoomCode || !urlRoomCode || inRoomCode !== urlRoomCode) return
-    const savedName = (localStorage.getItem('drawtogether_name') || '').trim()
+    const savedName = (localStorage.getItem('canvasx_name') || '').trim()
     if (!savedName) return
 
     autoReconnectedRef.current = true
@@ -107,7 +109,7 @@ export function JoinPage({ onJoinRoom }) {
         setSingleUserDiscardAt(response.singleUserDiscardAt)
 
         try {
-          sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+          sessionStorage.setItem('canvasx_in_room', response.roomCode)
           if (window.history.replaceState) {
             const url = new URL(window.location.href)
             url.searchParams.set('room', response.roomCode)
@@ -119,7 +121,7 @@ export function JoinPage({ onJoinRoom }) {
         onJoinRoom(response.roomId)
       } else {
         try {
-          sessionStorage.removeItem('drawtogether_in_room')
+          sessionStorage.removeItem('canvasx_in_room')
         } catch (_) {}
         addToast((response && response.message) || 'Room is no longer available', 'error')
       }
@@ -150,7 +152,7 @@ export function JoinPage({ onJoinRoom }) {
 
     setLoading(true)
     const trimmedName = name.trim()
-    localStorage.setItem('drawtogether_name', trimmedName)
+    localStorage.setItem('canvasx_name', trimmedName)
 
     socket.emit('room:create', { name: trimmedName }, (response) => {
       setLoading(false)
@@ -168,7 +170,7 @@ export function JoinPage({ onJoinRoom }) {
         // Sync active room to URL address bar and session storage
         if (typeof window !== 'undefined') {
           try {
-            sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+            sessionStorage.setItem('canvasx_in_room', response.roomCode)
             if (window.history.replaceState) {
               const url = new URL(window.location.href)
               url.searchParams.set('room', response.roomCode)
@@ -201,7 +203,7 @@ export function JoinPage({ onJoinRoom }) {
 
     setLoading(true)
     const trimmedName = name.trim()
-    localStorage.setItem('drawtogether_name', trimmedName)
+    localStorage.setItem('canvasx_name', trimmedName)
 
     socket.emit('room:join', { roomCode: trimmedCode, name: trimmedName }, (response) => {
       setLoading(false)
@@ -219,7 +221,7 @@ export function JoinPage({ onJoinRoom }) {
         // Sync active room to URL address bar and session storage
         if (typeof window !== 'undefined') {
           try {
-            sessionStorage.setItem('drawtogether_in_room', response.roomCode)
+            sessionStorage.setItem('canvasx_in_room', response.roomCode)
             if (window.history.replaceState) {
               const url = new URL(window.location.href)
               url.searchParams.set('room', response.roomCode)
@@ -263,7 +265,7 @@ export function JoinPage({ onJoinRoom }) {
             </svg>
           </div>
 
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">DrawTogether</h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">CanvasX</h1>
           <p className="text-slate-400 text-sm mt-1">Instant Real-time Collaborative Whiteboard</p>
         </div>
 
@@ -283,7 +285,7 @@ export function JoinPage({ onJoinRoom }) {
                   setInputRoomCode('')
                   if (typeof window !== 'undefined') {
                     try {
-                      sessionStorage.removeItem('drawtogether_in_room')
+                      sessionStorage.removeItem('canvasx_in_room')
                       if (window.history.replaceState) {
                         const url = new URL(window.location.href)
                         url.searchParams.delete('room')

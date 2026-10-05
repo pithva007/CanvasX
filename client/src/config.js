@@ -34,7 +34,7 @@ export const CONFIG = {
   ZOOM_STEP: 1.2,
 
   // Persistence
-  STORAGE_PREFIX: 'drawtogether_',
+  STORAGE_PREFIX: 'canvasx_',
   AUTO_SAVE_INTERVAL: 5000,
 
   // Limits

@@ -58,7 +58,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
     onDiscard: (message) => {
       if (typeof window !== 'undefined') {
         try {
-          sessionStorage.removeItem('drawtogether_in_room')
+          sessionStorage.removeItem('canvasx_in_room')
         } catch (_) {}
       }
       addToast(message || 'Room was discarded', 'info')
@@ -89,7 +89,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
     if (!roomCode) return
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.setItem('drawtogether_in_room', roomCode)
+        sessionStorage.setItem('canvasx_in_room', roomCode)
         if (window.history.replaceState) {
           const url = new URL(window.location.href)
           if (url.searchParams.get('room') !== roomCode) {
@@ -153,7 +153,7 @@ export function WhiteboardPage({ onLeaveRoom }) {
     if (socket) socket.emit('room:leave')
     if (typeof window !== 'undefined') {
       try {
-        sessionStorage.removeItem('drawtogether_in_room')
+        sessionStorage.removeItem('canvasx_in_room')
       } catch (_) {}
     }
     resetRoom()

@@ -71,7 +71,7 @@ export function useRoomUsers({ onDiscard, onUserJoined, onAdminChanged } = {}) {
       setSingleUserDiscardAt(null)
       const msg = data?.message || 'Room was discarded'
       try {
-        sessionStorage.setItem('drawtogether_discard_toast', msg)
+        sessionStorage.setItem('canvasx_discard_toast', msg)
       } catch (_) {}
       onDiscard?.(msg)
     }
