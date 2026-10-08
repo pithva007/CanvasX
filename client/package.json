@@ -2,6 +2,8 @@
   "name": "whiteboard-client",
   "private": true,
   "version": "1.0.0",
+  "license": "MIT",
+  "author": "Khush Pithva",
   "type": "module",
   "scripts": {
     "dev": "vite",
